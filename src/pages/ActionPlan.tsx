@@ -286,11 +286,11 @@ function KanbanBoard({
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-      gap: 12,
-      /* Board fills available viewport height so no page scroll is needed */
-      height: "calc(100vh - 300px)",
-      minHeight: 360,
+      /* Columnas de al menos 300 px; se apilan automáticamente en pantallas
+         más angostas sin necesidad de scroll horizontal */
+      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+      gap: 16,
+      alignItems: "start",
     }}>
       {COLUMNS.map((col) => {
         const cards = initiatives.filter((i) => i.status === col.status);
@@ -326,8 +326,8 @@ function KanbanBoard({
               }}>{cards.length}</span>
             </div>
 
-            {/* Cards — scroll interno */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "8px", display: "flex", flexDirection: "column", gap: 7 }}>
+            {/* Cards — scroll interno con altura máxima cómoda */}
+            <div style={{ maxHeight: 520, overflowY: "auto", padding: "8px", display: "flex", flexDirection: "column", gap: 7 }}>
               {cards.map((i) => (
                 <KanbanCard key={i.id} initiative={i} onDragStart={onDragStart} onReminder={onReminder} />
               ))}
