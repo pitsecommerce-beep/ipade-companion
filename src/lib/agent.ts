@@ -1,36 +1,68 @@
 import { supabase } from "./supabase";
-import type { AgentMessage } from "./types";
+import type { Initiative, InitiativeReport } from "./types";
 
-export interface AgentReply {
-  reply: string;
+/** Obtiene el token de sesión activo para enviarlo al servidor. */
+async function authHeader(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("No hay sesión activa. Vuelve a iniciar sesión.");
+  }
+  return `Bearer ${session.access_token}`;
 }
 
-/**
- * Llama a la Edge Function `agent` de Supabase. La función es quien guarda la
- * ANTHROPIC_API_KEY como secret y arma el contexto (Pasaporte + bitácoras +
- * documentos de la sesión) antes de invocar a Claude. El frontend nunca ve la
- * llave: solo envía el mensaje del usuario y la sesión sobre la que pregunta.
- */
+/** Llama a una ruta /api/* del servidor Railway con el token de sesión. */
+async function callApi<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": await authHeader(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+    throw new Error(err.error ?? `Error del servidor (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Chat con el agente                                                   */
+/* ------------------------------------------------------------------ */
+export interface AgentReply { reply: string }
+
 export async function askAgent(params: {
   sessionId: string | null;
   message: string;
-  history: Pick<AgentMessage, "role" | "content">[];
+  history: { role: "user" | "assistant"; content: string }[];
 }): Promise<string> {
-  const { data, error } = await supabase.functions.invoke<AgentReply>("agent", {
-    body: {
-      sessionId: params.sessionId,
-      message: params.message,
-      history: params.history,
-    },
+  const data = await callApi<AgentReply>("/api/agent", {
+    sessionId: params.sessionId,
+    message: params.message,
+    history: params.history,
   });
-
-  if (error) {
-    throw new Error(
-      `No se pudo contactar al agente. Verifica que la Edge Function "agent" esté desplegada y con ANTHROPIC_API_KEY configurada. (${error.message})`,
-    );
-  }
-  if (!data?.reply) {
-    throw new Error("El agente respondió vacío.");
-  }
+  if (!data.reply) throw new Error("El agente respondió vacío.");
   return data.reply;
+}
+
+/* ------------------------------------------------------------------ */
+/* Generación de Plan de Acción                                         */
+/* ------------------------------------------------------------------ */
+export interface GenerateReportResult {
+  report: InitiativeReport;
+  initiatives: Initiative[];
+}
+
+export async function generateReport(): Promise<GenerateReportResult> {
+  const data = await callApi<GenerateReportResult>("/api/generate-report", {});
+  if (!data.report) throw new Error("El reporte devuelto está vacío.");
+  return data;
+}
+
+/* ------------------------------------------------------------------ */
+/* Envío de recordatorio por correo                                     */
+/* ------------------------------------------------------------------ */
+export async function sendReminder(reminderId: string): Promise<void> {
+  await callApi<{ ok: boolean }>("/api/send-reminder", { reminderId });
 }

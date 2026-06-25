@@ -1,95 +1,57 @@
-// IPADE Companion — Edge Function "agent"
-//
-// Esta función es el único lugar donde vive la ANTHROPIC_API_KEY (como secret
-// de Supabase). El frontend estático nunca la ve. La función:
-//   1. Usa el JWT del participante para leer (respetando RLS) su Pasaporte,
-//      sus bitácoras y el texto de los documentos de la sesión.
-//   2. Arma el contexto y llama a la API de Claude (Anthropic).
-//   3. Devuelve { reply }.
-//
-// Despliegue:
-//   supabase functions deploy agent
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-//
-// SUPABASE_URL y SUPABASE_ANON_KEY se inyectan automáticamente en el runtime.
+// Ruta /api/agent — equivalente a la Edge Function de Supabase, ahora en Express/Node.
+// Lee Pasaporte + bitácoras + documentos de la jornada y llama a Claude.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Router } from "express";
+import { createClient } from "@supabase/supabase-js";
+
+const router = Router();
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
-
-// Límites defensivos para acotar tokens de contexto.
-const MAX_DOC_CHARS = 12_000; // por documento
-const MAX_TOTAL_DOC_CHARS = 40_000; // suma de documentos
-const MAX_HISTORY = 16; // mensajes previos que reenviamos
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const MAX_DOC_CHARS = 12_000;
+const MAX_TOTAL_DOC_CHARS = 40_000;
+const MAX_HISTORY = 16;
 
 interface ReqBody {
-  sessionId: string | null;
+  sessionId?: string | null;
   message: string;
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+interface Bitacora { title: string; content: string; updated_at: string }
+interface DocRow   { name: string; content_text: string | null }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-  if (req.method !== "POST") {
-    return json({ error: "Método no permitido" }, 405);
-  }
-
-  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+router.post("/", async (req, res) => {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
-    return json(
-      { error: "Falta configurar ANTHROPIC_API_KEY en los secrets de la función." },
-      500,
-    );
+    res.status(500).json({ error: "Falta ANTHROPIC_API_KEY en las variables de entorno." });
+    return;
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return json({ error: "No autorizado." }, 401);
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "No autorizado." });
+    return;
   }
 
-  let body: ReqBody;
-  try {
-    body = await req.json();
-  } catch {
-    return json({ error: "Cuerpo inválido." }, 400);
-  }
+  const body = req.body as ReqBody;
   if (!body.message?.trim()) {
-    return json({ error: "El mensaje está vacío." }, 400);
+    res.status(400).json({ error: "El mensaje está vacío." });
+    return;
   }
 
-  // Cliente con el JWT del participante → RLS garantiza que sólo lee sus datos.
   const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
+    process.env.VITE_SUPABASE_URL!,
+    process.env.VITE_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) {
-    return json({ error: "Sesión no válida." }, 401);
+    res.status(401).json({ error: "Sesión no válida." });
+    return;
   }
 
-  // --- Reunir contexto ---
   const [{ data: passport }, bitacorasRes, documentsRes] = await Promise.all([
     supabase.from("passports").select("*").eq("user_id", user.id).maybeSingle(),
     body.sessionId
@@ -98,13 +60,13 @@ Deno.serve(async (req) => {
           .select("title, content, updated_at")
           .eq("session_id", body.sessionId)
           .order("updated_at", { ascending: false })
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [] as Bitacora[] }),
     body.sessionId
       ? supabase
           .from("documents")
           .select("name, content_text")
           .eq("session_id", body.sessionId)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [] as DocRow[] }),
   ]);
 
   const systemPrompt = buildSystemPrompt(
@@ -113,7 +75,6 @@ Deno.serve(async (req) => {
     (documentsRes.data ?? []) as DocRow[],
   );
 
-  // --- Construir mensajes para Claude ---
   const history = (body.history ?? []).slice(-MAX_HISTORY);
   const messages = [
     ...history.map((m) => ({ role: m.role, content: m.content })),
@@ -121,7 +82,7 @@ Deno.serve(async (req) => {
   ];
 
   try {
-    const res = await fetch(ANTHROPIC_URL, {
+    const aiRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -137,41 +98,28 @@ Deno.serve(async (req) => {
       }),
     });
 
-    if (!res.ok) {
-      const detail = await res.text();
-      return json(
-        { error: `Error de la API de Claude (${res.status}): ${detail.slice(0, 500)}` },
-        502,
-      );
+    if (!aiRes.ok) {
+      const detail = await aiRes.text();
+      res.status(502).json({ error: `Error de Claude (${aiRes.status}): ${detail.slice(0, 500)}` });
+      return;
     }
 
-    const data = await res.json();
+    const data = await aiRes.json() as { content?: { type: string; text: string }[] };
     const reply = (data.content ?? [])
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text: string }) => b.text)
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
       .join("\n")
       .trim();
 
-    return json({ reply: reply || "(El agente no devolvió texto.)" });
+    res.json({ reply: reply || "(El agente no devolvió texto.)" });
   } catch (err) {
-    return json(
-      { error: `No se pudo contactar a Claude: ${err instanceof Error ? err.message : err}` },
-      502,
-    );
+    res.status(502).json({
+      error: `No se pudo contactar a Claude: ${err instanceof Error ? err.message : String(err)}`,
+    });
   }
 });
 
-interface Bitacora {
-  title: string;
-  content: string;
-  updated_at: string;
-}
-interface DocRow {
-  name: string;
-  content_text: string | null;
-}
-
-// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSystemPrompt(passport: any, bitacoras: Bitacora[], documents: DocRow[]): string {
   const parts: string[] = [];
 
@@ -210,18 +158,17 @@ Contexto adicional para el agente: ${ans.additional_context || "(no indicado)"}`
   if (bitacoras.length > 0) {
     const notes = bitacoras
       .map((b) => {
-        // Intentar parsear el nuevo formato JSON de la bitácora
         try {
-          const parsed = JSON.parse(b.content);
-          if (parsed && typeof parsed === "object" && "notes" in parsed) {
-            const parts: string[] = [`• ${b.title}`];
-            if (parsed.notes?.trim()) parts.push(`  Notas: ${parsed.notes}`);
-            if (parsed.insight?.trim()) parts.push(`  Insight clave: ${parsed.insight}`);
-            if (parsed.quick_win?.trim()) parts.push(`  Quick win declarado: ${parsed.quick_win}`);
-            if (parsed.loose_end?.trim()) parts.push(`  Duda/inquietud: ${parsed.loose_end}`);
-            return parts.join("\n");
+          const parsed = JSON.parse(b.content) as Record<string, string>;
+          if (parsed && "notes" in parsed) {
+            const p: string[] = [`• ${b.title}`];
+            if (parsed.notes?.trim())     p.push(`  Notas: ${parsed.notes}`);
+            if (parsed.insight?.trim())   p.push(`  Insight clave: ${parsed.insight}`);
+            if (parsed.quick_win?.trim()) p.push(`  Quick win declarado: ${parsed.quick_win}`);
+            if (parsed.loose_end?.trim()) p.push(`  Duda/inquietud: ${parsed.loose_end}`);
+            return p.join("\n");
           }
-        } catch { /* formato legado: plain text */ }
+        } catch { /* texto plano legado */ }
         return `• ${b.title}: ${b.content}`;
       })
       .join("\n")
@@ -243,8 +190,10 @@ Contexto adicional para el agente: ${ans.additional_context || "(no indicado)"}`
       total += text.length;
       chunks.push(`[Documento: ${d.name}]\n${text}`);
     }
-    parts.push(`--- MATERIALES DE ESTA SESIÓN ---\n${chunks.join("\n\n")}`);
+    parts.push(`--- MATERIALES DE ESTA JORNADA ---\n${chunks.join("\n\n")}`);
   }
 
   return parts.join("\n\n");
 }
+
+export default router;

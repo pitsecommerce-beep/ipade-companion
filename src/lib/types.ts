@@ -54,6 +54,45 @@ export interface DocumentRecord {
   created_at: string;
 }
 
+export interface InitiativeReport {
+  id: string;
+  user_id: string;
+  content: string; // markdown
+  created_at: string;
+}
+
+export type InitiativeCategory = "inmediata" | "portafolio";
+export type InitiativeStatus = "pendiente" | "en_progreso" | "completada" | "diferida";
+
+export interface Initiative {
+  id: string;
+  user_id: string;
+  report_id: string | null;
+  title: string;
+  description: string;
+  category: InitiativeCategory;
+  source: "passport" | "bitacora" | "manual";
+  email_subject: string;
+  email_body: string;
+  status: InitiativeStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailReminder {
+  id: string;
+  user_id: string;
+  initiative_id: string | null;
+  email_to: string;
+  subject: string;
+  body: string;
+  send_at: string | null;
+  sent_at: string | null;
+  status: "pendiente" | "enviado" | "fallido";
+  error_msg: string | null;
+  created_at: string;
+}
+
 export interface AgentMessage {
   id: string;
   user_id: string;

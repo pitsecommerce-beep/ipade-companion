@@ -1,57 +1,7 @@
-name: Deploy Supabase (Edge Function + secret)
-
-# Despliega la Edge Function "agent" y configura su secret ANTHROPIC_API_KEY
-# tomándolo de los Actions Secrets. La llave viaja de:
-#     GitHub Actions Secrets  ->  Secret de la Edge Function (Supabase)
-# y NUNCA entra al build del frontend ni a ninguna variable VITE_*.
+# Este workflow ya no es necesario.
+# Las Edge Functions de Supabase fueron reemplazadas por rutas Express
+# en el servidor Railway (server/routes/). Las variables de entorno
+# (ANTHROPIC_API_KEY, RESEND_API_KEY, etc.) se configuran directamente
+# en el dashboard de Railway → Variables.
 #
-# Secrets requeridos en el repo (Settings -> Secrets and variables -> Actions -> Secrets):
-#   - ANTHROPIC_API_KEY     (sk-ant-...)
-#   - SUPABASE_ACCESS_TOKEN (token personal de la CLI de Supabase)
-#   - SUPABASE_PROJECT_REF  (ref del proyecto, p.ej. abcd1234efgh5678)
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - "supabase/**"
-      - ".github/workflows/deploy-supabase.yml"
-  workflow_dispatch:
-
-jobs:
-  deploy-functions:
-    runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verificar que los secrets requeridos existen
-        run: |
-          missing=()
-          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing+=("SUPABASE_ACCESS_TOKEN")
-          [ -z "${{ secrets.SUPABASE_PROJECT_REF }}" ] && missing+=("SUPABASE_PROJECT_REF")
-          [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] && missing+=("ANTHROPIC_API_KEY")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Faltan estos Actions Secrets: ${missing[*]}"
-            echo "Créalos en Settings → Secrets and variables → Actions → Secrets y vuelve a ejecutar."
-            exit 1
-          fi
-          echo "Todos los secrets requeridos están presentes."
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Configurar secret ANTHROPIC_API_KEY en Supabase
-        run: |
-          supabase secrets set \
-            ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-
-      - name: Desplegar Edge Function "agent"
-        run: |
-          supabase functions deploy agent \
-            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+# Conservado como referencia. Puedes eliminarlo si lo deseas.

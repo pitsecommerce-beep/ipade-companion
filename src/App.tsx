@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Passport from "./pages/Passport";
 import Dashboard from "./pages/Dashboard";
 import SessionDetail from "./pages/SessionDetail";
+import ActionPlan from "./pages/ActionPlan";
 import type { ReactNode } from "react";
 
 function Brand() {
@@ -34,6 +35,7 @@ function Layout({ children }: { children: ReactNode }) {
                 Jornadas
               </NavLink>
               <NavLink to="/pasaporte">Pasaporte</NavLink>
+              <NavLink to="/plan">Plan de Acción</NavLink>
               <button className="btn btn-ghost btn-sm" onClick={() => signOut()}>
                 Salir
               </button>
@@ -103,6 +105,14 @@ export default function App() {
           element={
             <Protected>
               <Passport />
+            </Protected>
+          }
+        />
+        <Route
+          path="/plan"
+          element={
+            <Protected>
+              <ActionPlan />
             </Protected>
           }
         />

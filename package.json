@@ -5,23 +5,30 @@
   "type": "module",
   "description": "IPADE Companion — plataforma de acompañamiento para participantes del IPADE: Pasaporte, Bitácoras y un agente de IA con contexto.",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n CLIENT,SERVER -c cyan,magenta \"vite\" \"tsx watch server/index.ts\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "start": "tsx server/index.ts",
+    "typecheck": "tsc -b --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "express": "^4.21.2",
     "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
+    "react-router-dom": "^6.26.2",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^20.19.43",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.1.2",
     "typescript": "^5.5.4",
     "vite": "^5.4.8"
   }
