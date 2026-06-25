@@ -1,0 +1,6 @@
+project_id = "ipade-companion"
+
+[functions.agent]
+# Requiere JWT válido: así la función puede identificar al participante y
+# aplicar RLS al leer su Pasaporte, bitácoras y documentos.
+verify_jwt = true
