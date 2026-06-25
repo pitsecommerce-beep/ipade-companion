@@ -36,6 +36,7 @@ function emailHtml(body: string): string {
 }
 
 router.post("/", async (req, res) => {
+  try {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
     res.status(503).json({
@@ -106,6 +107,12 @@ router.post("/", async (req, res) => {
     .eq("id", reminder.id);
 
   res.json({ ok: true, messageId: resendBody.id });
+  } catch (err) {
+    console.error("[send-reminder] Unhandled error:", err);
+    res.status(500).json({
+      error: `Error inesperado: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
 });
 
 export default router;
