@@ -34,11 +34,14 @@ todo ese contexto para resolver dudas y ayudar a planear iniciativas.
    supabase link --project-ref <TU_PROJECT_REF>
    supabase db push
    ```
-3. Despliega la Edge Function del agente y configura el secret con tu API key:
+3. Despliega la Edge Function del agente y configura el secret con tu API key.
+   Puedes hacerlo manualmente:
    ```bash
    supabase functions deploy agent
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
    ```
+   …o automáticamente desde CI (recomendado): ver
+   [§ Desplegar el backend desde GitHub Actions](#4-desplegar-el-backend-desde-github-actions).
    (`SUPABASE_URL` y `SUPABASE_ANON_KEY` se inyectan automáticamente.)
 
 ## 2. Desarrollo local
@@ -72,7 +75,30 @@ VITE_SUPABASE_ANON_KEY=tu-anon-key-publica
    [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) construye y
    publica el sitio en `https://<usuario>.github.io/ipade-companion/`.
 
-## 4. Uso
+## 4. Desplegar el backend desde GitHub Actions
+
+El workflow [`.github/workflows/deploy-supabase.yml`](.github/workflows/deploy-supabase.yml)
+despliega la Edge Function y configura su secret `ANTHROPIC_API_KEY` tomándolo
+de los **Actions Secrets**. La llave viaja de *Actions Secrets* al secret de la
+Edge Function en Supabase y **nunca** entra al build del frontend.
+
+En **Settings → Secrets and variables → Actions → Secrets**, crea:
+
+| Secret                  | Valor                                                        |
+| ----------------------- | ------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`     | Tu API key de Anthropic (`sk-ant-…`).                        |
+| `SUPABASE_ACCESS_TOKEN` | Token personal de la CLI de Supabase (Account → Access Tokens). |
+| `SUPABASE_PROJECT_REF`  | El *ref* del proyecto (Settings → General → Reference ID).   |
+
+El workflow corre al hacer push a `main` con cambios en `supabase/**`, o
+manualmente desde la pestaña **Actions** (*Run workflow*).
+
+> ⚠️ **Importante:** `ANTHROPIC_API_KEY` va en *Actions **Secrets***, no en
+> *Variables*, y **jamás** debe pasarse como variable `VITE_*` al build del
+> frontend (quedaría expuesta en el JavaScript público). Solo el workflow de
+> backend la usa.
+
+## 5. Uso
 
 1. Crea tu cuenta e inicia sesión.
 2. Completa tu **Pasaporte IPADE**.

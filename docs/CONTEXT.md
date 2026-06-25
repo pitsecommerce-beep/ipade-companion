@@ -116,7 +116,15 @@ Notas:
   Variables de repo: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
   `base` de Vite = `/ipade-companion/` (nombre del repo).
 - **Backend** → Supabase: aplicar la migración, desplegar la Edge Function y
-  configurar el secret `ANTHROPIC_API_KEY`. Ver `README.md`.
+  configurar el secret `ANTHROPIC_API_KEY`. Se puede hacer a mano (CLI) o desde
+  CI con `.github/workflows/deploy-supabase.yml`, que toma `ANTHROPIC_API_KEY`,
+  `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` de los **Actions Secrets** y
+  los aplica a la Edge Function. Ver `README.md` §4.
+
+> ⚠️ `ANTHROPIC_API_KEY` vive en **Actions Secrets** (no en *Variables*) y solo
+> la usa el workflow de backend para configurarla como secret de la Edge
+> Function. **Nunca** debe pasarse como variable `VITE_*` al build del frontend:
+> quedaría embebida en el JavaScript público de GitHub Pages.
 
 ## 7. Estado actual / pendientes
 
