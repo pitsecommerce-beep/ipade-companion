@@ -68,7 +68,7 @@ VITE_SUPABASE_ANON_KEY=tu-anon-key-publica
    `base` de Vite coincida; si usas otro nombre, ajusta `VITE_BASE`).
 2. En **Settings → Pages**, en *Build and deployment* selecciona **GitHub
    Actions** como *Source*.
-3. En **Settings → Secrets and variables → Actions → Variables**, crea:
+3. En **Settings → Secrets and variables → Actions → Secrets**, crea:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 4. Haz push a `main`. El workflow
@@ -97,6 +97,19 @@ manualmente desde la pestaña **Actions** (*Run workflow*).
 > *Variables*, y **jamás** debe pasarse como variable `VITE_*` al build del
 > frontend (quedaría expuesta en el JavaScript público). Solo el workflow de
 > backend la usa.
+
+### Resumen de Actions Secrets
+
+Todos los valores se guardan en **Settings → Secrets and variables → Actions →
+Secrets**:
+
+| Secret                  | Lo usa             | ¿Llega al frontend?                       |
+| ----------------------- | ------------------ | ----------------------------------------- |
+| `VITE_SUPABASE_URL`     | `deploy.yml`       | Sí (valor público).                       |
+| `VITE_SUPABASE_ANON_KEY`| `deploy.yml`       | Sí (valor público).                       |
+| `ANTHROPIC_API_KEY`     | `deploy-supabase.yml` | **No** — solo va al secret de la Edge Function. |
+| `SUPABASE_ACCESS_TOKEN` | `deploy-supabase.yml` | No.                                    |
+| `SUPABASE_PROJECT_REF`  | `deploy-supabase.yml` | No.                                    |
 
 ## 5. Uso
 

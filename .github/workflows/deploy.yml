@@ -34,10 +34,12 @@ jobs:
 
       - name: Build
         env:
-          # Variables PÚBLICAS del frontend. Configúralas en:
-          # Settings → Secrets and variables → Actions → Variables
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # Conexión pública a Supabase. Se leen de los Actions Secrets
+          # (Settings → Secrets and variables → Actions → Secrets).
+          # La URL y el anon key son valores públicos (acaban embebidos en el
+          # sitio estático), pero se guardan como Secrets por consistencia.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # ⚠️ NUNCA agregues aquí ANTHROPIC_API_KEY ni ninguna otra llave secreta:
           # este build genera un sitio estático y cualquier variable VITE_* queda
           # embebida en el JavaScript público. La API key de Anthropic se maneja

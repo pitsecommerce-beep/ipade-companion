@@ -113,8 +113,9 @@ Notas:
 ## 6. Despliegue
 
 - **Frontend** → GitHub Pages vía Actions (`.github/workflows/deploy.yml`).
-  Variables de repo: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-  `base` de Vite = `/ipade-companion/` (nombre del repo).
+  Actions Secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (valores
+  públicos; van embebidos en el sitio estático). `base` de Vite =
+  `/ipade-companion/` (nombre del repo).
 - **Backend** → Supabase: aplicar la migración, desplegar la Edge Function y
   configurar el secret `ANTHROPIC_API_KEY`. Se puede hacer a mano (CLI) o desde
   CI con `.github/workflows/deploy-supabase.yml`, que toma `ANTHROPIC_API_KEY`,
