@@ -1,36 +1,13 @@
-name: Deploy to Railway
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verificar secrets requeridos
-        run: |
-          missing=()
-          [ -z "${{ secrets.RAILWAY_TOKEN }}" ]      && missing+=("RAILWAY_TOKEN")
-          [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ] && missing+=("RAILWAY_SERVICE_ID")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Faltan estos Actions Secrets: ${missing[*]}"
-            echo "Créalos en Settings → Secrets and variables → Actions → Secrets."
-            echo ""
-            echo "RAILWAY_TOKEN     → railway.app → Account Settings → Tokens → New Token"
-            echo "RAILWAY_SERVICE_ID → railway.app → tu proyecto → servicio → Settings → Service ID"
-            exit 1
-          fi
-          echo "Todos los secrets requeridos están presentes."
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --detach --service ${{ secrets.RAILWAY_SERVICE_ID }}
+# Railway se conecta directamente a este repositorio y despliega
+# automáticamente en cada push a main — no se necesita un workflow de CI/CD.
+#
+# Este archivo existe solo como documentación. Si Railway pierde la
+# conexión al repo, reconéctalo en:
+#   railway.app → tu proyecto → Settings → Source → Connect Repo
+#
+# Variables de entorno que debes configurar en Railway → Variables:
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_ANON_KEY
+#   ANTHROPIC_API_KEY
+#   RESEND_API_KEY         (opcional — habilita correos recordatorio)
+#   RESEND_FROM_EMAIL      (opcional — dirección de origen)
