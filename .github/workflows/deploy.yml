@@ -15,10 +15,14 @@ jobs:
       - name: Verificar secrets requeridos
         run: |
           missing=()
-          [ -z "${{ secrets.RAILWAY_TOKEN }}" ] && missing+=("RAILWAY_TOKEN")
+          [ -z "${{ secrets.RAILWAY_TOKEN }}" ]      && missing+=("RAILWAY_TOKEN")
+          [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ] && missing+=("RAILWAY_SERVICE_ID")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Faltan estos Actions Secrets: ${missing[*]}"
             echo "Créalos en Settings → Secrets and variables → Actions → Secrets."
+            echo ""
+            echo "RAILWAY_TOKEN     → railway.app → Account Settings → Tokens → New Token"
+            echo "RAILWAY_SERVICE_ID → railway.app → tu proyecto → servicio → Settings → Service ID"
             exit 1
           fi
           echo "Todos los secrets requeridos están presentes."
@@ -29,4 +33,4 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --detach
+        run: railway up --detach --service ${{ secrets.RAILWAY_SERVICE_ID }}
