@@ -27,6 +27,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verificar que los secrets requeridos existen
+        run: |
+          missing=()
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing+=("SUPABASE_ACCESS_TOKEN")
+          [ -z "${{ secrets.SUPABASE_PROJECT_REF }}" ] && missing+=("SUPABASE_PROJECT_REF")
+          [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] && missing+=("ANTHROPIC_API_KEY")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Faltan estos Actions Secrets: ${missing[*]}"
+            echo "Créalos en Settings → Secrets and variables → Actions → Secrets y vuelve a ejecutar."
+            exit 1
+          fi
+          echo "Todos los secrets requeridos están presentes."
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
