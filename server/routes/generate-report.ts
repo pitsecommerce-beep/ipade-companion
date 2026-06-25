@@ -2,7 +2,7 @@
 // y las persiste en initiative_reports + initiatives.
 
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
+import { createUserClient } from "../lib/supabase.js";
 
 const router = Router();
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -35,11 +35,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.VITE_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const supabase = createUserClient(authHeader);
 
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user) {
