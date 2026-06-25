@@ -1,4 +1,5 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { isSupabaseConfigured } from "./lib/supabase";
 import Login from "./pages/Login";
@@ -24,6 +25,8 @@ function Brand() {
 
 function Layout({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -31,12 +34,14 @@ function Layout({ children }: { children: ReactNode }) {
           <Brand />
           {user && (
             <nav className="nav">
-              <NavLink to="/" end>
-                Jornadas
-              </NavLink>
+              <NavLink to="/" end>Jornadas</NavLink>
               <NavLink to="/pasaporte">Pasaporte</NavLink>
               <NavLink to="/plan">Plan de Acción</NavLink>
-              <button className="btn btn-sm" style={{background:"#c0392b",color:"#fff",border:"none"}} onClick={() => signOut()}>
+              <button
+                className="btn btn-sm"
+                style={{ background: "#c0392b", color: "#fff", border: "none" }}
+                onClick={() => setConfirmLogout(true)}
+              >
                 Salir
               </button>
             </nav>
@@ -47,6 +52,33 @@ function Layout({ children }: { children: ReactNode }) {
       <footer className="footer">
         IPADE Companion · Herramienta de apoyo para participantes del IPADE Business School.
       </footer>
+
+      {confirmLogout && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "grid", placeItems: "center", zIndex: 200, padding: 20,
+        }}>
+          <div className="card" style={{ maxWidth: 360, width: "100%", textAlign: "center", padding: "32px 28px" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
+            <h2 style={{ margin: "0 0 8px" }}>¿Cerrar sesión?</h2>
+            <p style={{ color: "var(--muted)", margin: "0 0 24px", fontSize: 14 }}>
+              Tu información está guardada. Podrás volver a acceder en cualquier momento.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                className="btn btn-sm"
+                style={{ background: "#c0392b", color: "#fff", border: "none", padding: "8px 20px" }}
+                onClick={() => { signOut(); setConfirmLogout(false); }}
+              >
+                Cerrar sesión
+              </button>
+              <button className="btn btn-ghost" onClick={() => setConfirmLogout(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
