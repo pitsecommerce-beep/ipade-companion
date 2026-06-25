@@ -12,7 +12,7 @@ const COLUMNS: { status: InitiativeStatus; label: string; color: string; bg: str
   { status: "pendiente",   label: "Pendiente",   color: "#6b7280", bg: "#f9fafb" },
   { status: "en_progreso", label: "En progreso", color: "#2563eb", bg: "#eff6ff" },
   { status: "completada",  label: "Completada",  color: "#16a34a", bg: "#f0fdf4" },
-  { status: "diferida",    label: "Diferida",    color: "#d97706", bg: "#fffbeb" },
+  { status: "diferida",    label: "Demorada",    color: "#d97706", bg: "#fffbeb" },
 ];
 
 const CATEGORY_BADGE = {
@@ -449,7 +449,7 @@ function ListView({
 
 const STATUS_LABELS: Record<string, string> = {
   pendiente: "Pendiente", en_progreso: "En progreso",
-  completada: "Completada", diferida: "Diferida",
+  completada: "Completada", diferida: "Demorada",
 };
 
 function ListCard({
