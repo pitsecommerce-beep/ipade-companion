@@ -8,20 +8,14 @@ import type { AgentMessage, Bitacora, DocumentRecord, StudySession } from "../li
 
 type Tab = "bitacoras" | "materiales" | "agente";
 
-/* Estructura interna del contenido de una bitácora */
 interface BitacoraContent {
-  notes: string;
+  notes: string;   // HTML desde el editor enriquecido
   insight: string;
   quick_win: string;
   loose_end: string;
 }
 
-const EMPTY_CONTENT: BitacoraContent = {
-  notes: "",
-  insight: "",
-  quick_win: "",
-  loose_end: "",
-};
+const EMPTY_CONTENT: BitacoraContent = { notes: "", insight: "", quick_win: "", loose_end: "" };
 
 function parseContent(raw: string): BitacoraContent {
   try {
@@ -29,9 +23,7 @@ function parseContent(raw: string): BitacoraContent {
     if (typeof parsed === "object" && parsed !== null && "notes" in parsed) {
       return { ...EMPTY_CONTENT, ...parsed };
     }
-  } catch {
-    // legacy: contenido plain text → va a notas
-  }
+  } catch { /* legacy plain text */ }
   return { ...EMPTY_CONTENT, notes: raw };
 }
 
@@ -39,6 +31,157 @@ function serializeContent(c: BitacoraContent): string {
   return JSON.stringify(c);
 }
 
+/** Extrae texto plano de HTML para el preview en la lista */
+function htmlToText(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent ?? "";
+}
+
+/* ===================================================================== */
+/* Editor enriquecido — toolbar + contentEditable                         */
+/* ===================================================================== */
+const HIGHLIGHTS = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca", ""];
+
+function RichTextEditor({
+  editorKey,
+  initialValue,
+  onChange,
+  placeholder,
+  minHeight = 300,
+}: {
+  editorKey: string;
+  initialValue: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+  minHeight?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [activeHighlight, setActiveHighlight] = useState("");
+
+  // Inicializar contenido al montar o al cambiar el editorKey (nueva bitácora / edición)
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = initialValue;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorKey]);
+
+  function exec(command: string, value?: string) {
+    ref.current?.focus();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).execCommand(command, false, value ?? undefined);
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
+  function highlight(color: string) {
+    setActiveHighlight(color);
+    exec("hiliteColor", color || "transparent");
+  }
+
+  const btnBase: React.CSSProperties = {
+    border: "1px solid var(--line)", borderRadius: 4, padding: "3px 8px",
+    fontSize: 13, cursor: "pointer", background: "#fff", color: "var(--ink)",
+    lineHeight: 1.4, display: "inline-flex", alignItems: "center", justifyContent: "center",
+  };
+
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+      {/* Barra de herramientas */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", gap: 4, padding: "6px 10px",
+        background: "#f8f9fb", borderBottom: "1px solid var(--line)",
+      }}>
+        <button type="button" title="Negrita (Ctrl+B)" style={{ ...btnBase, fontWeight: "bold" }} onClick={() => exec("bold")}>B</button>
+        <button type="button" title="Cursiva (Ctrl+I)"   style={{ ...btnBase, fontStyle: "italic" }} onClick={() => exec("italic")}>I</button>
+        <button type="button" title="Subrayado (Ctrl+U)" style={{ ...btnBase, textDecoration: "underline" }} onClick={() => exec("underline")}>U</button>
+        <button type="button" title="Tachado"            style={{ ...btnBase, textDecoration: "line-through" }} onClick={() => exec("strikeThrough")}>S</button>
+
+        <span style={{ width: 1, background: "var(--line)", margin: "0 4px" }} />
+
+        <button type="button" title="Encabezado 1" style={{ ...btnBase, fontFamily: "Georgia, serif", fontWeight: 700 }}
+          onClick={() => exec("formatBlock", "H2")}>H1</button>
+        <button type="button" title="Encabezado 2" style={{ ...btnBase, fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 11 }}
+          onClick={() => exec("formatBlock", "H3")}>H2</button>
+        <button type="button" title="Párrafo normal" style={{ ...btnBase, fontSize: 11 }}
+          onClick={() => exec("formatBlock", "P")}>¶</button>
+
+        <span style={{ width: 1, background: "var(--line)", margin: "0 4px" }} />
+
+        <button type="button" title="Lista con viñetas" style={btnBase} onClick={() => exec("insertUnorderedList")}>• Lista</button>
+        <button type="button" title="Lista numerada"    style={btnBase} onClick={() => exec("insertOrderedList")}>1. Lista</button>
+
+        <span style={{ width: 1, background: "var(--line)", margin: "0 4px" }} />
+
+        {/* Colores de resaltado */}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>Resaltar:</span>
+          {HIGHLIGHTS.map((c) => (
+            <button
+              key={c || "none"}
+              type="button"
+              title={c ? `Resaltar (${c})` : "Quitar resaltado"}
+              onClick={() => highlight(c)}
+              style={{
+                ...btnBase,
+                width: 20, height: 20, padding: 0,
+                background: c || "#fff",
+                border: c === activeHighlight ? "2px solid var(--ipade-navy)" : "1px solid var(--line)",
+                boxSizing: "border-box",
+              }}
+            >
+              {!c && <span style={{ fontSize: 10, lineHeight: 1 }}>✕</span>}
+            </button>
+          ))}
+        </span>
+
+        <span style={{ width: 1, background: "var(--line)", margin: "0 4px" }} />
+
+        <button type="button" title="Quitar formato" style={{ ...btnBase, fontSize: 11, color: "var(--muted)" }}
+          onClick={() => exec("removeFormat")}>
+          A/ Limpiar
+        </button>
+      </div>
+
+      {/* Área editable */}
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        onInput={() => { if (ref.current) onChange(ref.current.innerHTML); }}
+        style={{
+          minHeight,
+          padding: "16px 20px",
+          fontSize: 14,
+          lineHeight: 1.75,
+          outline: "none",
+          fontFamily: '"Inter", "Segoe UI", sans-serif',
+          color: "var(--ink)",
+          background: "#fafbfc",
+          overflowY: "auto",
+        }}
+      />
+
+      <style>{`
+        [contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: var(--muted);
+          pointer-events: none;
+        }
+        [contenteditable] h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 18px; margin: 12px 0 6px; color: var(--ipade-navy); }
+        [contenteditable] h3 { font-size: 15px; margin: 10px 0 4px; color: var(--ipade-navy); }
+        [contenteditable] ul, [contenteditable] ol { padding-left: 22px; margin: 6px 0; }
+        [contenteditable] li { margin-bottom: 3px; }
+        [contenteditable] p  { margin: 4px 0; }
+      `}</style>
+    </div>
+  );
+}
+
+/* ===================================================================== */
+/* Página principal                                                        */
+/* ===================================================================== */
 export default function SessionDetail() {
   const { id = "" } = useParams();
   const { user } = useAuth();
@@ -65,41 +208,36 @@ export default function SessionDetail() {
   return (
     <>
       <div className="page-head">
-        <Link to="/" className="muted" style={{ fontSize: 13 }}>
-          ← Mis jornadas
-        </Link>
+        <Link to="/" className="muted" style={{ fontSize: 13 }}>← Mis jornadas</Link>
         <h1 style={{ marginTop: 6 }}>{session.title}</h1>
         {session.description && <p>{session.description}</p>}
       </div>
 
       <div className="tabs">
-        <button className={tab === "bitacoras" ? "active" : ""} onClick={() => setTab("bitacoras")}>
-          Bitácoras
-        </button>
-        <button className={tab === "materiales" ? "active" : ""} onClick={() => setTab("materiales")}>
-          Materiales
-        </button>
-        <button className={tab === "agente" ? "active" : ""} onClick={() => setTab("agente")}>
-          Agente
-        </button>
+        <button className={tab === "bitacoras" ? "active" : ""} onClick={() => setTab("bitacoras")}>Bitácoras</button>
+        <button className={tab === "materiales" ? "active" : ""} onClick={() => setTab("materiales")}>Materiales</button>
+        <button className={tab === "agente"    ? "active" : ""} onClick={() => setTab("agente")}>Agente</button>
       </div>
 
       {tab === "bitacoras" && <Bitacoras sessionId={id} userId={user.id} />}
       {tab === "materiales" && <Materiales sessionId={id} userId={user.id} />}
-      {tab === "agente" && <Agente sessionId={id} userId={user.id} />}
+      {tab === "agente"    && <Agente sessionId={id} userId={user.id} />}
     </>
   );
 }
 
-/* ----------------------------- Bitácoras ----------------------------- */
+/* ===================================================================== */
+/* Bitácoras                                                               */
+/* ===================================================================== */
 function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string }) {
-  const [items, setItems] = useState<Bitacora[]>([]);
+  const [items, setItems]     = useState<Bitacora[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Bitacora | null>(null);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState<BitacoraContent>(EMPTY_CONTENT);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [title, setTitle]     = useState("");
+  const [body, setBody]       = useState<BitacoraContent>(EMPTY_CONTENT);
+  const [editorKey, setEditorKey] = useState("new");   // force remount on edit
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -118,6 +256,7 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
     setEditing(null);
     setTitle("");
     setBody(EMPTY_CONTENT);
+    setEditorKey(`new-${Date.now()}`);
   }
 
   async function save(e: FormEvent) {
@@ -152,22 +291,27 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
   function startEdit(b: Bitacora) {
     setEditing(b);
     setTitle(b.title);
-    setBody(parseContent(b.content));
+    const parsed = parseContent(b.content);
+    setBody(parsed);
+    setEditorKey(`edit-${b.id}`);
   }
 
   return (
-    <div style={{ display: "grid", gap: 24, gridTemplateColumns: "minmax(0,1.2fr) minmax(0,0.8fr)" }}>
-      {/* Panel izquierdo: formulario */}
+    /* Layout: formulario ocupa todo el ancho disponible; lista debajo en pantallas medianas,
+       a la derecha en pantallas grandes */
+    <div style={{
+      display: "grid",
+      gap: 24,
+      gridTemplateColumns: "minmax(0,2fr) minmax(260px,1fr)",
+    }}>
+      {/* ── Formulario (izquierda / arriba) ── */}
       <div>
         {error && <div className="alert alert-error">{error}</div>}
 
         <form onSubmit={save}>
-          {/* Título de la bitácora */}
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="b-title">
-                {editing ? "Editando bitácora" : "Nueva bitácora"}
-              </label>
+              <label htmlFor="b-title">{editing ? "Editando bitácora" : "Nueva bitácora"}</label>
               <input
                 id="b-title"
                 placeholder="Ej. Sesión de la mañana — Caso Cemex"
@@ -178,34 +322,24 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
             </div>
           </div>
 
-          {/* Notas durante la sesión */}
+          {/* Notas — editor enriquecido */}
           <div className="card" style={{ marginBottom: 16 }}>
             <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, color: "var(--ipade-navy)" }}>
               Notas de la sesión
             </h3>
-            <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+            <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 10 }}>
               Para tomar durante la sesión — apuntes libres, ideas, referencias.
             </p>
-            <textarea
-              id="b-notes"
-              style={{
-                minHeight: 260,
-                fontFamily: '"Inter", "Segoe UI", sans-serif',
-                fontSize: 14,
-                lineHeight: 1.7,
-                background: "#fafbfc",
-                border: "1px solid var(--line)",
-                borderRadius: 6,
-                padding: "14px 16px",
-                resize: "vertical",
-              }}
+            <RichTextEditor
+              editorKey={editorKey}
+              initialValue={body.notes}
+              onChange={(html) => setBody((b) => ({ ...b, notes: html }))}
               placeholder="Escribe aquí tus apuntes, ideas y referencias mientras transcurre la sesión…"
-              value={body.notes}
-              onChange={(e) => setBody((b) => ({ ...b, notes: e.target.value }))}
+              minHeight={320}
             />
           </div>
 
-          {/* Preguntas de reflexión posterior */}
+          {/* Reflexión posterior */}
           <div className="card" style={{ borderLeft: "4px solid var(--ipade-gold)", marginBottom: 16 }}>
             <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, color: "var(--ipade-navy)" }}>
               Reflexión posterior
@@ -262,15 +396,13 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
               {saving ? "Guardando…" : editing ? "Actualizar bitácora" : "Guardar bitácora"}
             </button>
             {editing && (
-              <button type="button" className="btn btn-ghost" onClick={reset}>
-                Cancelar
-              </button>
+              <button type="button" className="btn btn-ghost" onClick={reset}>Cancelar</button>
             )}
           </div>
         </form>
       </div>
 
-      {/* Panel derecho: lista */}
+      {/* ── Lista (derecha / abajo) ── */}
       <div>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Bitácoras de esta jornada</h2>
         {loading ? (
@@ -280,6 +412,7 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
         ) : (
           items.map((b) => {
             const parsed = parseContent(b.content);
+            const preview = htmlToText(parsed.notes);
             const hasReflection = parsed.insight || parsed.quick_win || parsed.loose_end;
             return (
               <div key={b.id} className="card" style={{ padding: 16, marginBottom: 12 }}>
@@ -289,28 +422,21 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
                     {new Date(b.updated_at).toLocaleDateString("es-MX")}
                   </small>
                 </div>
-
-                {parsed.notes && (
-                  <p className="muted" style={{ whiteSpace: "pre-wrap", fontSize: 13, marginBottom: 8 }}>
-                    {parsed.notes.length > 160 ? parsed.notes.slice(0, 160) + "…" : parsed.notes}
+                {preview && (
+                  <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                    {preview.length > 140 ? preview.slice(0, 140) + "…" : preview}
                   </p>
                 )}
-
                 {hasReflection && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                    {parsed.insight && <span className="tag">Insight ✓</span>}
+                    {parsed.insight   && <span className="tag">Insight ✓</span>}
                     {parsed.quick_win && <span className="tag">Quick win ✓</span>}
                     {parsed.loose_end && <span className="tag">Duda ✓</span>}
                   </div>
                 )}
-
                 <div className="btn-row">
-                  <button className="btn btn-ghost btn-sm" onClick={() => startEdit(b)}>
-                    Editar
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => remove(b)}>
-                    Eliminar
-                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => startEdit(b)}>Editar</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => remove(b)}>Eliminar</button>
                 </div>
               </div>
             );
@@ -321,13 +447,15 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
   );
 }
 
-/* ----------------------------- Materiales ----------------------------- */
+/* ===================================================================== */
+/* Materiales                                                              */
+/* ===================================================================== */
 function Materiales({ sessionId, userId }: { sessionId: string; userId: string }) {
-  const [items, setItems] = useState<DocumentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems]       = useState<DocumentRecord[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus]     = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -364,13 +492,9 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
       }
 
       const { error: dbErr } = await supabase.from("documents").insert({
-        session_id: sessionId,
-        user_id: userId,
-        name: file.name,
-        storage_path: path,
-        mime_type: file.type || null,
-        size_bytes: file.size,
-        content_text: contentText,
+        session_id: sessionId, user_id: userId, name: file.name,
+        storage_path: path, mime_type: file.type || null,
+        size_bytes: file.size, content_text: contentText,
       });
       if (dbErr) throw dbErr;
 
@@ -386,9 +510,7 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
   }
 
   async function download(doc: DocumentRecord) {
-    const { data, error } = await supabase.storage
-      .from(MATERIALS_BUCKET)
-      .createSignedUrl(doc.storage_path, 60);
+    const { data, error } = await supabase.storage.from(MATERIALS_BUCKET).createSignedUrl(doc.storage_path, 60);
     if (error) setError(error.message);
     else if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   }
@@ -406,8 +528,8 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Cargar material</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Sube los PDFs de los casos del IPADE, presentaciones y materiales de la
-          jornada. El texto de los PDFs se indexa para que el agente pueda usarlo.
+          Sube los PDFs de los casos del IPADE, presentaciones y materiales de la jornada.
+          El texto de los PDFs se indexa para que el agente pueda usarlo.
         </p>
         {error && <div className="alert alert-error">{error}</div>}
         {status && <div className="alert alert-info">{status}</div>}
@@ -415,47 +537,43 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
           <div className="field">
             <input ref={fileRef} type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md" />
           </div>
-          <button className="btn btn-gold" disabled={uploading}>
-            {uploading ? "Subiendo…" : "Subir archivo"}
-          </button>
+          <button className="btn btn-gold" disabled={uploading}>{uploading ? "Subiendo…" : "Subir archivo"}</button>
         </form>
       </div>
 
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Materiales de la jornada</h2>
-        {loading ? (
-          <p>Cargando…</p>
-        ) : items.length === 0 ? (
+        {loading ? <p>Cargando…</p> : items.length === 0 ? (
           <p className="muted">Aún no hay materiales cargados.</p>
-        ) : (
-          items.map((d) => (
-            <div key={d.id} className="list-item">
-              <div>
-                <h3>{d.name}</h3>
-                <small>
-                  {d.content_text ? <span className="tag">texto indexado</span> : null}{" "}
-                  {d.size_bytes ? `${(d.size_bytes / 1024).toFixed(0)} KB · ` : ""}
-                  {new Date(d.created_at).toLocaleDateString("es-MX")}
-                </small>
-              </div>
-              <div className="btn-row">
-                <button className="btn btn-ghost btn-sm" onClick={() => download(d)}>Ver</button>
-                <button className="btn btn-danger btn-sm" onClick={() => remove(d)}>Eliminar</button>
-              </div>
+        ) : items.map((d) => (
+          <div key={d.id} className="list-item">
+            <div>
+              <h3>{d.name}</h3>
+              <small>
+                {d.content_text ? <span className="tag">texto indexado</span> : null}{" "}
+                {d.size_bytes ? `${(d.size_bytes / 1024).toFixed(0)} KB · ` : ""}
+                {new Date(d.created_at).toLocaleDateString("es-MX")}
+              </small>
             </div>
-          ))
-        )}
+            <div className="btn-row">
+              <button className="btn btn-ghost btn-sm" onClick={() => download(d)}>Ver</button>
+              <button className="btn btn-danger btn-sm" onClick={() => remove(d)}>Eliminar</button>
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
 }
 
-/* ----------------------------- Agente ----------------------------- */
+/* ===================================================================== */
+/* Agente                                                                  */
+/* ===================================================================== */
 function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [input, setInput]       = useState("");
+  const [busy, setBusy]         = useState(false);
+  const [error, setError]       = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -483,32 +601,22 @@ function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
     setBusy(true);
 
     const userMsg: AgentMessage = {
-      id: `tmp-${Date.now()}`,
-      user_id: userId,
-      session_id: sessionId,
-      role: "user",
-      content: text,
-      created_at: new Date().toISOString(),
+      id: `tmp-${Date.now()}`, user_id: userId, session_id: sessionId,
+      role: "user", content: text, created_at: new Date().toISOString(),
     };
     setMessages((m) => [...m, userMsg]);
-    await supabase
-      .from("agent_messages")
+    await supabase.from("agent_messages")
       .insert({ session_id: sessionId, user_id: userId, role: "user", content: text });
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
       const reply = await askAgent({ sessionId, message: text, history });
       const botMsg: AgentMessage = {
-        id: `tmp-bot-${Date.now()}`,
-        user_id: userId,
-        session_id: sessionId,
-        role: "assistant",
-        content: reply,
-        created_at: new Date().toISOString(),
+        id: `tmp-bot-${Date.now()}`, user_id: userId, session_id: sessionId,
+        role: "assistant", content: reply, created_at: new Date().toISOString(),
       };
       setMessages((m) => [...m, botMsg]);
-      await supabase
-        .from("agent_messages")
+      await supabase.from("agent_messages")
         .insert({ session_id: sessionId, user_id: userId, role: "assistant", content: reply });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error del agente.");
@@ -522,39 +630,24 @@ function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
       <h2 style={{ marginTop: 0 }}>Agente IPADE Companion</h2>
       <p className="muted" style={{ marginTop: 0 }}>
         El agente conoce tu Pasaporte, tus bitácoras y los materiales de esta jornada.
-        Pregúntale dudas o cuéntale una iniciativa para que te ayude a planearla según
-        el contexto de tu empresa.
+        Pregúntale dudas o cuéntale una iniciativa para que te ayude a planearla.
       </p>
-
       {error && <div className="alert alert-error">{error}</div>}
-
       <div className="chat-log" ref={logRef}>
         {messages.length === 0 && !busy && (
           <div className="bubble assistant">
             Hola, soy tu IPADE Companion. ¿En qué te puedo ayudar con esta jornada?
-            Puedes pedirme que resuelva dudas del caso o que te ayude a planear una
-            iniciativa considerando la situación de tu empresa.
           </div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className={`bubble ${m.role}`}>
-            {m.content}
-          </div>
-        ))}
+        {messages.map((m) => <div key={m.id} className={`bubble ${m.role}`}>{m.content}</div>)}
         {busy && <div className="bubble assistant">Pensando…</div>}
       </div>
-
       <form className="chat-input" onSubmit={send}>
         <textarea
           value={input}
           placeholder="Escribe tu mensaje…  (Enter para enviar, Shift+Enter para salto de línea)"
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send(e);
-            }
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e); } }}
         />
         <button className="btn btn-primary" disabled={busy || !input.trim()}>
           {busy ? <span className="spinner" /> : "Enviar"}
