@@ -182,6 +182,7 @@ Hablas en español, con un tono profesional, claro y cercano, propio de una escu
   );
 
   if (passport) {
+    const ans = (passport.answers ?? {}) as Record<string, string>;
     parts.push(`--- PASAPORTE DEL PARTICIPANTE ---
 Nombre: ${passport.full_name || "(no indicado)"}
 Puesto: ${passport.role || "(no indicado)"}
@@ -194,7 +195,12 @@ Tamaño: ${passport.company_size || "(no indicado)"}
 Posición en la industria: ${passport.company_role || "(no indicado)"}
 Contexto de la industria: ${passport.industry_context || "(no indicado)"}
 Situación de la empresa: ${passport.company_context || "(no indicado)"}
-Iniciativas/objetivos en mente: ${passport.objectives || "(no indicado)"}`);
+Iniciativas/objetivos en mente: ${passport.objectives || "(no indicado)"}
+
+Prioridad de desarrollo (habilidades/conocimientos): ${ans.dev_priorities || "(no indicado)"}
+Iniciativa estratégica prioritaria: ${ans.strategic_initiative || "(no indicado)"}
+Mayores obstáculos actuales: ${ans.obstacles || "(no indicado)"}
+Contexto adicional para el agente: ${ans.additional_context || "(no indicado)"}`);
   } else {
     parts.push(
       `--- PASAPORTE DEL PARTICIPANTE ---\n(El participante aún no ha completado su Pasaporte. Sugiérele llenarlo para darle mejor acompañamiento.)`,
@@ -203,10 +209,24 @@ Iniciativas/objetivos en mente: ${passport.objectives || "(no indicado)"}`);
 
   if (bitacoras.length > 0) {
     const notes = bitacoras
-      .map((b) => `• ${b.title}: ${b.content}`)
+      .map((b) => {
+        // Intentar parsear el nuevo formato JSON de la bitácora
+        try {
+          const parsed = JSON.parse(b.content);
+          if (parsed && typeof parsed === "object" && "notes" in parsed) {
+            const parts: string[] = [`• ${b.title}`];
+            if (parsed.notes?.trim()) parts.push(`  Notas: ${parsed.notes}`);
+            if (parsed.insight?.trim()) parts.push(`  Insight clave: ${parsed.insight}`);
+            if (parsed.quick_win?.trim()) parts.push(`  Quick win declarado: ${parsed.quick_win}`);
+            if (parsed.loose_end?.trim()) parts.push(`  Duda/inquietud: ${parsed.loose_end}`);
+            return parts.join("\n");
+          }
+        } catch { /* formato legado: plain text */ }
+        return `• ${b.title}: ${b.content}`;
+      })
       .join("\n")
       .slice(0, 12_000);
-    parts.push(`--- BITÁCORAS (NOTAS) DE ESTA SESIÓN ---\n${notes}`);
+    parts.push(`--- BITÁCORAS (NOTAS) DE ESTA JORNADA ---\n${notes}`);
   }
 
   if (documents.length > 0) {
