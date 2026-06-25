@@ -10,7 +10,9 @@ import type { ReactNode } from "react";
 function Brand() {
   return (
     <NavLink to="/" className="brand">
-      <span className="brand-mark">IC</span>
+      <span className="brand-mark">
+        <img src="https://www.ipade.mx/wp-content/uploads/2022/10/fav.png?w=512" alt="IPADE" />
+      </span>
       <span className="brand-text">
         <strong>IPADE Companion</strong>
         <span>Acompañamiento académico</span>
