@@ -10,6 +10,30 @@ const PORT = Number(process.env.PORT ?? 3001);
 // En producción el build de Vite está en dist/ (junto al servidor)
 const DIST = path.resolve(__dirname, "../dist");
 
+// Validar variables de entorno al arrancar y avisar en consola.
+const REQUIRED_VARS = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "ANTHROPIC_API_KEY"];
+const OPTIONAL_VARS: { name: string; feature: string }[] = [
+  { name: "RESEND_API_KEY",    feature: "envío de correos recordatorio" },
+  { name: "RESEND_FROM_EMAIL", feature: "dirección de origen de correos" },
+];
+
+const missingRequired = REQUIRED_VARS.filter((v) => !process.env[v]);
+if (missingRequired.length > 0) {
+  console.error("❌  Variables de entorno REQUERIDAS no configuradas:");
+  missingRequired.forEach((v) => console.error(`     • ${v}`));
+  console.error("   El servidor no puede iniciar correctamente sin ellas.\n");
+}
+
+const missingOptional = OPTIONAL_VARS.filter(({ name }) => !process.env[name]);
+if (missingOptional.length > 0) {
+  console.warn("⚠️   Variables de entorno OPCIONALES no configuradas:");
+  missingOptional.forEach(({ name, feature }) =>
+    console.warn(`     • ${name}  →  necesaria para: ${feature}`)
+  );
+  console.warn("   El servidor inicia normalmente; las funciones que dependen");
+  console.warn("   de estas variables devolverán un error 503 al ser invocadas.\n");
+}
+
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 

@@ -38,8 +38,8 @@ function emailHtml(body: string): string {
 router.post("/", async (req, res) => {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    res.status(500).json({
-      error: "Falta RESEND_API_KEY en las variables de entorno. Configúrala en Railway.",
+    res.status(503).json({
+      error: "El envío de correos no está habilitado en este entorno. Configura RESEND_API_KEY en las variables de Railway para activarlo.",
     });
     return;
   }
