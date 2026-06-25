@@ -36,7 +36,7 @@ function Layout({ children }: { children: ReactNode }) {
               </NavLink>
               <NavLink to="/pasaporte">Pasaporte</NavLink>
               <NavLink to="/plan">Plan de Acción</NavLink>
-              <button className="btn btn-ghost btn-sm" onClick={() => signOut()}>
+              <button className="btn btn-sm" style={{background:"#c0392b",color:"#fff",border:"none"}} onClick={() => signOut()}>
                 Salir
               </button>
             </nav>
