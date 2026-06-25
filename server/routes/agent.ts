@@ -2,7 +2,7 @@
 // Lee Pasaporte + bitácoras + documentos de la jornada y llama a Claude.
 
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
+import { createUserClient } from "../lib/supabase.js";
 
 const router = Router();
 
@@ -41,11 +41,7 @@ router.post("/", async (req, res) => {
     return;
   }
 
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL!,
-    process.env.VITE_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
+  const supabase = createUserClient(authHeader);
 
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) {

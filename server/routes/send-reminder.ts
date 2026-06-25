@@ -2,7 +2,7 @@
 // Requiere RESEND_API_KEY en las variables de entorno de Railway.
 
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
+import { createUserClient } from "../lib/supabase.js";
 
 const router = Router();
 const RESEND_URL = "https://api.resend.com/emails";
@@ -51,11 +51,7 @@ router.post("/", async (req, res) => {
     return;
   }
 
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL!,
-    process.env.VITE_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
+  const supabase = createUserClient(authHeader);
 
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr || !user) { res.status(401).json({ error: "Sesión no válida." }); return; }
