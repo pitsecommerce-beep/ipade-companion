@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "description": "IPADE Companion — plataforma de acompañamiento para participantes del IPADE: Pasaporte, Bitácoras y un agente de IA con contexto.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "concurrently -n CLIENT,SERVER -c cyan,magenta \"vite\" \"tsx watch server/index.ts\"",
     "dev:client": "vite",
