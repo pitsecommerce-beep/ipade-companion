@@ -92,8 +92,8 @@ const COMPANY: Question[] = [
 const DEVELOPMENT: AnswerQuestion[] = [
   {
     key: "dev_priorities",
-    label: "Prioridad de desarrollo: capacidades duras y blandas",
-    hint: "¿Qué competencias técnicas y habilidades de liderazgo quieres fortalecer?",
+    label: "¿Cuál sería tu prioridad de desarrollo en términos de tus habilidades y conocimientos?",
+    hint: "Considera tanto competencias técnicas como habilidades directivas y de liderazgo",
     long: true,
   },
   {
