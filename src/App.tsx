@@ -31,7 +31,7 @@ function Layout({ children }: { children: ReactNode }) {
           {user && (
             <nav className="nav">
               <NavLink to="/" end>
-                Sesiones
+                Jornadas
               </NavLink>
               <NavLink to="/pasaporte">Pasaporte</NavLink>
               <button className="btn btn-ghost btn-sm" onClick={() => signOut()}>

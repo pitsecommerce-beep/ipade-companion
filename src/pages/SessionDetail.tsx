@@ -8,6 +8,37 @@ import type { AgentMessage, Bitacora, DocumentRecord, StudySession } from "../li
 
 type Tab = "bitacoras" | "materiales" | "agente";
 
+/* Estructura interna del contenido de una bitácora */
+interface BitacoraContent {
+  notes: string;
+  insight: string;
+  quick_win: string;
+  loose_end: string;
+}
+
+const EMPTY_CONTENT: BitacoraContent = {
+  notes: "",
+  insight: "",
+  quick_win: "",
+  loose_end: "",
+};
+
+function parseContent(raw: string): BitacoraContent {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null && "notes" in parsed) {
+      return { ...EMPTY_CONTENT, ...parsed };
+    }
+  } catch {
+    // legacy: contenido plain text → va a notas
+  }
+  return { ...EMPTY_CONTENT, notes: raw };
+}
+
+function serializeContent(c: BitacoraContent): string {
+  return JSON.stringify(c);
+}
+
 export default function SessionDetail() {
   const { id = "" } = useParams();
   const { user } = useAuth();
@@ -28,14 +59,14 @@ export default function SessionDetail() {
   }, [id]);
 
   if (error) return <div className="alert alert-error">{error}</div>;
-  if (!session) return <div className="card">Cargando sesión…</div>;
+  if (!session) return <div className="card">Cargando jornada…</div>;
   if (!user) return null;
 
   return (
     <>
       <div className="page-head">
         <Link to="/" className="muted" style={{ fontSize: 13 }}>
-          ← Mis sesiones
+          ← Mis jornadas
         </Link>
         <h1 style={{ marginTop: 6 }}>{session.title}</h1>
         {session.description && <p>{session.description}</p>}
@@ -66,7 +97,7 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Bitacora | null>(null);
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [body, setBody] = useState<BitacoraContent>(EMPTY_CONTENT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,14 +112,12 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
     setLoading(false);
   }, [sessionId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   function reset() {
     setEditing(null);
     setTitle("");
-    setContent("");
+    setBody(EMPTY_CONTENT);
   }
 
   async function save(e: FormEvent) {
@@ -96,6 +125,7 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
     if (!title.trim()) return;
     setSaving(true);
     setError(null);
+    const content = serializeContent(body);
     let res;
     if (editing) {
       res = await supabase
@@ -109,45 +139,127 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
     }
     setSaving(false);
     if (res.error) setError(res.error.message);
-    else {
-      reset();
-      load();
-    }
+    else { reset(); load(); }
   }
 
   async function remove(b: Bitacora) {
     if (!confirm(`¿Eliminar la bitácora "${b.title}"?`)) return;
     const { error } = await supabase.from("bitacoras").delete().eq("id", b.id);
     if (error) setError(error.message);
-    else {
-      if (editing?.id === b.id) reset();
-      load();
-    }
+    else { if (editing?.id === b.id) reset(); load(); }
+  }
+
+  function startEdit(b: Bitacora) {
+    setEditing(b);
+    setTitle(b.title);
+    setBody(parseContent(b.content));
   }
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>{editing ? "Editar bitácora" : "Nueva bitácora"}</h2>
+    <div style={{ display: "grid", gap: 24, gridTemplateColumns: "minmax(0,1.2fr) minmax(0,0.8fr)" }}>
+      {/* Panel izquierdo: formulario */}
+      <div>
         {error && <div className="alert alert-error">{error}</div>}
+
         <form onSubmit={save}>
-          <div className="field">
-            <label htmlFor="b-title">Título</label>
-            <input id="b-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          {/* Título de la bitácora */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="b-title">
+                {editing ? "Editando bitácora" : "Nueva bitácora"}
+              </label>
+              <input
+                id="b-title"
+                placeholder="Ej. Sesión de la mañana — Caso Cemex"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="b-content">Notas</label>
+
+          {/* Notas durante la sesión */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, color: "var(--ipade-navy)" }}>
+              Notas de la sesión
+            </h3>
+            <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 12 }}>
+              Para tomar durante la sesión — apuntes libres, ideas, referencias.
+            </p>
             <textarea
-              id="b-content"
-              style={{ minHeight: 220 }}
-              placeholder="Tus apuntes, aprendizajes y preguntas de esta sesión…"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+              id="b-notes"
+              style={{
+                minHeight: 260,
+                fontFamily: '"Inter", "Segoe UI", sans-serif',
+                fontSize: 14,
+                lineHeight: 1.7,
+                background: "#fafbfc",
+                border: "1px solid var(--line)",
+                borderRadius: 6,
+                padding: "14px 16px",
+                resize: "vertical",
+              }}
+              placeholder="Escribe aquí tus apuntes, ideas y referencias mientras transcurre la sesión…"
+              value={body.notes}
+              onChange={(e) => setBody((b) => ({ ...b, notes: e.target.value }))}
             />
           </div>
+
+          {/* Preguntas de reflexión posterior */}
+          <div className="card" style={{ borderLeft: "4px solid var(--ipade-gold)", marginBottom: 16 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 4, fontSize: 15, color: "var(--ipade-navy)" }}>
+              Reflexión posterior
+            </h3>
+            <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 20 }}>
+              Para completar al terminar la jornada — consolida lo aprendido.
+            </p>
+
+            <div className="field">
+              <label htmlFor="b-insight">
+                1. ¿Cuál fue el insight, concepto o momento clave que "te hizo clic"
+                o desafió tu forma actual de pensar?
+              </label>
+              <textarea
+                id="b-insight"
+                style={{ minHeight: 90 }}
+                placeholder="El concepto, caso o discusión que más te impactó o cuestionó…"
+                value={body.insight}
+                onChange={(e) => setBody((b) => ({ ...b, insight: e.target.value }))}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="b-quickwin">
+                2. Nombra una sola acción concreta (Quick win) que puedas ejecutar
+                en el próximo mes, inspirada en las sesiones de hoy.
+              </label>
+              <textarea
+                id="b-quickwin"
+                style={{ minHeight: 90 }}
+                placeholder="Una acción específica, medible y alcanzable en los próximos 30 días…"
+                value={body.quick_win}
+                onChange={(e) => setBody((b) => ({ ...b, quick_win: e.target.value }))}
+              />
+            </div>
+
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="b-looseend">
+                3. ¿Qué duda, cabo suelto o inquietud te quedó dando vueltas en la
+                cabeza sobre la que te gustaría profundizar?
+              </label>
+              <textarea
+                id="b-looseend"
+                style={{ minHeight: 90 }}
+                placeholder="Una pregunta abierta, tensión no resuelta o tema que quieres explorar más…"
+                value={body.loose_end}
+                onChange={(e) => setBody((b) => ({ ...b, loose_end: e.target.value }))}
+              />
+            </div>
+          </div>
+
           <div className="btn-row">
             <button className="btn btn-primary" disabled={saving}>
-              {saving ? "Guardando…" : editing ? "Actualizar" : "Guardar bitácora"}
+              {saving ? "Guardando…" : editing ? "Actualizar bitácora" : "Guardar bitácora"}
             </button>
             {editing && (
               <button type="button" className="btn btn-ghost" onClick={reset}>
@@ -158,43 +270,51 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
         </form>
       </div>
 
+      {/* Panel derecho: lista */}
       <div>
-        <h2 style={{ marginTop: 0 }}>Bitácoras de la sesión</h2>
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>Bitácoras de esta jornada</h2>
         {loading ? (
           <div className="card">Cargando…</div>
         ) : items.length === 0 ? (
-          <div className="card muted">Aún no hay bitácoras en esta sesión.</div>
+          <div className="card muted">Aún no hay bitácoras en esta jornada.</div>
         ) : (
-          items.map((b) => (
-            <div key={b.id} className="card" style={{ padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 16 }}>{b.title}</h3>
-                <small className="muted">
-                  {new Date(b.updated_at).toLocaleDateString("es-MX")}
-                </small>
+          items.map((b) => {
+            const parsed = parseContent(b.content);
+            const hasReflection = parsed.insight || parsed.quick_win || parsed.loose_end;
+            return (
+              <div key={b.id} className="card" style={{ padding: 16, marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 15 }}>{b.title}</h3>
+                  <small className="muted" style={{ whiteSpace: "nowrap" }}>
+                    {new Date(b.updated_at).toLocaleDateString("es-MX")}
+                  </small>
+                </div>
+
+                {parsed.notes && (
+                  <p className="muted" style={{ whiteSpace: "pre-wrap", fontSize: 13, marginBottom: 8 }}>
+                    {parsed.notes.length > 160 ? parsed.notes.slice(0, 160) + "…" : parsed.notes}
+                  </p>
+                )}
+
+                {hasReflection && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {parsed.insight && <span className="tag">Insight ✓</span>}
+                    {parsed.quick_win && <span className="tag">Quick win ✓</span>}
+                    {parsed.loose_end && <span className="tag">Duda ✓</span>}
+                  </div>
+                )}
+
+                <div className="btn-row">
+                  <button className="btn btn-ghost btn-sm" onClick={() => startEdit(b)}>
+                    Editar
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => remove(b)}>
+                    Eliminar
+                  </button>
+                </div>
               </div>
-              {b.content && (
-                <p className="muted" style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>
-                  {b.content.length > 240 ? b.content.slice(0, 240) + "…" : b.content}
-                </p>
-              )}
-              <div className="btn-row">
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setEditing(b);
-                    setTitle(b.title);
-                    setContent(b.content);
-                  }}
-                >
-                  Editar
-                </button>
-                <button className="btn btn-danger btn-sm" onClick={() => remove(b)}>
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -221,9 +341,7 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
     setLoading(false);
   }, [sessionId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -239,15 +357,10 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
         .upload(path, file, { upsert: false, contentType: file.type || undefined });
       if (upErr) throw upErr;
 
-      // Extrae texto de PDFs para que el agente pueda consultarlo.
       let contentText: string | null = null;
       if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
         setStatus("Extrayendo texto del PDF…");
-        try {
-          contentText = await extractPdfText(file);
-        } catch {
-          contentText = null; // si falla, conservamos el archivo igualmente
-        }
+        try { contentText = await extractPdfText(file); } catch { contentText = null; }
       }
 
       const { error: dbErr } = await supabase.from("documents").insert({
@@ -294,7 +407,7 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
         <h2 style={{ marginTop: 0 }}>Cargar material</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Sube los PDFs de los casos del IPADE, presentaciones y materiales de la
-          sesión. El texto de los PDFs se indexa para que el agente pueda usarlo.
+          jornada. El texto de los PDFs se indexa para que el agente pueda usarlo.
         </p>
         {error && <div className="alert alert-error">{error}</div>}
         {status && <div className="alert alert-info">{status}</div>}
@@ -309,7 +422,7 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
       </div>
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Materiales de la sesión</h2>
+        <h2 style={{ marginTop: 0 }}>Materiales de la jornada</h2>
         {loading ? (
           <p>Cargando…</p>
         ) : items.length === 0 ? (
@@ -326,12 +439,8 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
                 </small>
               </div>
               <div className="btn-row">
-                <button className="btn btn-ghost btn-sm" onClick={() => download(d)}>
-                  Ver
-                </button>
-                <button className="btn btn-danger btn-sm" onClick={() => remove(d)}>
-                  Eliminar
-                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => download(d)}>Ver</button>
+                <button className="btn btn-danger btn-sm" onClick={() => remove(d)}>Eliminar</button>
               </div>
             </div>
           ))
@@ -382,7 +491,6 @@ function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
       created_at: new Date().toISOString(),
     };
     setMessages((m) => [...m, userMsg]);
-    // Persiste el mensaje del usuario.
     await supabase
       .from("agent_messages")
       .insert({ session_id: sessionId, user_id: userId, role: "user", content: text });
@@ -413,7 +521,7 @@ function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Agente IPADE Companion</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        El agente conoce tu Pasaporte, tus bitácoras y los materiales de esta sesión.
+        El agente conoce tu Pasaporte, tus bitácoras y los materiales de esta jornada.
         Pregúntale dudas o cuéntale una iniciativa para que te ayude a planearla según
         el contexto de tu empresa.
       </p>
@@ -423,7 +531,7 @@ function Agente({ sessionId, userId }: { sessionId: string; userId: string }) {
       <div className="chat-log" ref={logRef}>
         {messages.length === 0 && !busy && (
           <div className="bubble assistant">
-            Hola, soy tu IPADE Companion. ¿En qué te puedo ayudar con esta sesión?
+            Hola, soy tu IPADE Companion. ¿En qué te puedo ayudar con esta jornada?
             Puedes pedirme que resuelva dudas del caso o que te ayude a planear una
             iniciativa considerando la situación de tu empresa.
           </div>
