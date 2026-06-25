@@ -58,10 +58,10 @@ export default function Dashboard() {
   return (
     <>
       <div className="page-head">
-        <h1>Mis sesiones</h1>
+        <h1>Mis jornadas</h1>
         <p>
-          Crea una sesión por cada caso, módulo o tema del IPADE. Dentro de cada una
-          podrás escribir tus bitácoras, cargar materiales y consultar al agente.
+          Registra cada día de programa como una jornada. Dentro de cada una podrás
+          tomar notas de las sesiones, cargar materiales y consultar al agente.
         </p>
       </div>
 
@@ -76,13 +76,13 @@ export default function Dashboard() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Nueva sesión</h2>
+        <h2 style={{ marginTop: 0 }}>Nueva jornada</h2>
         <form onSubmit={createSession}>
           <div className="field">
-            <label htmlFor="title">Título</label>
+            <label htmlFor="title">Nombre de la jornada</label>
             <input
               id="title"
-              placeholder="Ej. Caso Cemex — Estrategia"
+              placeholder="Ej. Jornada 1 — Dirección General"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -94,23 +94,23 @@ export default function Dashboard() {
             </label>
             <input
               id="desc"
-              placeholder="Módulo, profesor, fecha…"
+              placeholder="Fecha, módulo, temas del día…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
           <button className="btn btn-gold" disabled={creating}>
-            {creating ? "Creando…" : "Crear sesión"}
+            {creating ? "Creando…" : "Crear jornada"}
           </button>
         </form>
       </div>
 
       <div style={{ marginTop: 24 }}>
         {loading ? (
-          <div className="card">Cargando sesiones…</div>
+          <div className="card">Cargando jornadas…</div>
         ) : sessions.length === 0 ? (
           <div className="card muted">
-            Todavía no tienes sesiones. Crea la primera arriba.
+            Todavía no tienes jornadas registradas. Crea la primera arriba.
           </div>
         ) : (
           sessions.map((s) => (
