@@ -19,8 +19,22 @@ const EMPTY: Form = {
   objectives: "",
 };
 
+const EMPTY_ANSWERS: Record<string, string> = {
+  dev_priorities: "",
+  strategic_initiative: "",
+  obstacles: "",
+  additional_context: "",
+};
+
 interface Question {
   key: keyof Form;
+  label: string;
+  hint?: string;
+  long?: boolean;
+}
+
+interface AnswerQuestion {
+  key: string;
   label: string;
   hint?: string;
   long?: boolean;
@@ -75,13 +89,42 @@ const COMPANY: Question[] = [
   },
 ];
 
+const DEVELOPMENT: AnswerQuestion[] = [
+  {
+    key: "dev_priorities",
+    label: "¿Cuál sería tu prioridad de desarrollo en términos de tus habilidades y conocimientos?",
+    hint: "Considera tanto competencias técnicas como habilidades directivas y de liderazgo",
+    long: true,
+  },
+  {
+    key: "strategic_initiative",
+    label: "Iniciativa estratégica prioritaria en tu rol directivo",
+    hint: "¿Existe algún proyecto o transformación que sea urgente o de alto impacto?",
+    long: true,
+  },
+  {
+    key: "obstacles",
+    label: "Mayores obstáculos que enfrentas hoy",
+    hint: "Barreras internas, externas o personales que limitan tu avance",
+    long: true,
+  },
+  {
+    key: "additional_context",
+    label: "¿Algo más que debería saber tu IPADE Companion?",
+    hint: "Retos adicionales, contexto relevante o áreas donde el agente puede ayudarte mejor",
+    long: true,
+  },
+];
+
 export default function PassportPage() {
   const { user } = useAuth();
   const [form, setForm] = useState<Form>(EMPTY);
+  const [answers, setAnswers] = useState<Record<string, string>>(EMPTY_ANSWERS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -93,13 +136,16 @@ export default function PassportPage() {
       .then(({ data, error }) => {
         if (error) setError(error.message);
         if (data) {
-          const { id, user_id, created_at, updated_at, answers, ...rest } = data as Passport;
+          const { id, user_id, created_at, updated_at, answers: savedAnswers, ...rest } = data as Passport;
           void id;
           void user_id;
           void created_at;
           void updated_at;
-          void answers;
           setForm({ ...EMPTY, ...rest });
+          if (savedAnswers) {
+            setAnswers({ ...EMPTY_ANSWERS, ...savedAnswers });
+          }
+          setPrivacyAccepted(true);
         }
         setLoading(false);
       });
@@ -110,6 +156,11 @@ export default function PassportPage() {
     setSavedAt(null);
   }
 
+  function updateAnswer(key: string, value: string) {
+    setAnswers((a) => ({ ...a, [key]: value }));
+    setSavedAt(null);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -117,7 +168,7 @@ export default function PassportPage() {
     setError(null);
     const { error } = await supabase
       .from("passports")
-      .upsert({ ...form, user_id: user.id }, { onConflict: "user_id" });
+      .upsert({ ...form, answers, user_id: user.id }, { onConflict: "user_id" });
     setSaving(false);
     if (error) {
       setError(error.message);
@@ -138,30 +189,71 @@ export default function PassportPage() {
         </p>
       </div>
 
+      {/* Aviso de privacidad */}
+      {!privacyAccepted ? (
+        <div className="card" style={{ borderLeft: "4px solid var(--ipade-gold)", marginBottom: 24 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Aviso de privacidad y confidencialidad</h2>
+          <p style={{ marginBottom: 12 }}>
+            La información que compartas en este Pasaporte es estrictamente confidencial y
+            será utilizada <strong>únicamente</strong> para personalizar tu experiencia de
+            acompañamiento dentro del programa IPADE.
+          </p>
+          <ul style={{ paddingLeft: 20, marginBottom: 12, lineHeight: 1.8 }}>
+            <li>Tus datos <strong>no serán compartidos</strong> con terceros ni utilizados con fines comerciales.</li>
+            <li>La información permanece asociada a tu cuenta personal y no es visible para otros participantes.</li>
+            <li>Su único propósito es enriquecer el contexto del agente de IA para que las respuestas sean más relevantes a tu situación.</li>
+            <li>Puedes actualizar o eliminar tu información en cualquier momento.</li>
+          </ul>
+          <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: 13 }}>
+            Al continuar, aceptas que la información ingresada se usará exclusivamente para el desarrollo de tus sesiones en IPADE Companion.
+          </p>
+          <button className="btn btn-primary" onClick={() => setPrivacyAccepted(true)}>
+            Entendido, continuar con mi Pasaporte
+          </button>
+        </div>
+      ) : (
+        <div className="alert alert-info" style={{ borderLeft: "3px solid var(--ipade-gold)", marginBottom: 20 }}>
+          <strong>Privacidad:</strong> Tu información es confidencial y se usa exclusivamente para personalizar tus sesiones. No se comparte con terceros ni se usa con fines comerciales.
+        </div>
+      )}
+
       {error && <div className="alert alert-error">{error}</div>}
       {savedAt && <div className="alert alert-ok">Pasaporte guardado a las {savedAt}.</div>}
 
-      <form onSubmit={onSubmit}>
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>Sobre ti</h2>
-          {PERSON.map((q) => (
-            <Field key={q.key} q={q} value={form[q.key]} onChange={update} />
-          ))}
-        </div>
+      {privacyAccepted && (
+        <form onSubmit={onSubmit}>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Sobre ti</h2>
+            {PERSON.map((q) => (
+              <Field key={q.key} q={q} value={form[q.key]} onChange={update} />
+            ))}
+          </div>
 
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>Sobre tu empresa e industria</h2>
-          {COMPANY.map((q) => (
-            <Field key={q.key} q={q} value={form[q.key]} onChange={update} />
-          ))}
-        </div>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Sobre tu empresa e industria</h2>
+            {COMPANY.map((q) => (
+              <Field key={q.key} q={q} value={form[q.key]} onChange={update} />
+            ))}
+          </div>
 
-        <div className="btn-row" style={{ marginTop: 16 }}>
-          <button className="btn btn-primary" disabled={saving}>
-            {saving ? "Guardando…" : "Guardar Pasaporte"}
-          </button>
-        </div>
-      </form>
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Desarrollo directivo y prioridades</h2>
+            <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 20, fontSize: 14 }}>
+              Esta sección ayuda al agente a entender tus prioridades de crecimiento y los retos
+              más importantes que enfrentas como directivo.
+            </p>
+            {DEVELOPMENT.map((q) => (
+              <AnswerField key={q.key} q={q} value={answers[q.key] ?? ""} onChange={updateAnswer} />
+            ))}
+          </div>
+
+          <div className="btn-row" style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" disabled={saving}>
+              {saving ? "Guardando…" : "Guardar Pasaporte"}
+            </button>
+          </div>
+        </form>
+      )}
     </>
   );
 }
@@ -174,6 +266,29 @@ function Field({
   q: Question;
   value: string;
   onChange: (k: keyof Form, v: string) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor={q.key}>
+        {q.label} {q.hint && <span className="hint">— {q.hint}</span>}
+      </label>
+      {q.long ? (
+        <textarea id={q.key} value={value} onChange={(e) => onChange(q.key, e.target.value)} />
+      ) : (
+        <input id={q.key} value={value} onChange={(e) => onChange(q.key, e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+function AnswerField({
+  q,
+  value,
+  onChange,
+}: {
+  q: AnswerQuestion;
+  value: string;
+  onChange: (k: string, v: string) => void;
 }) {
   return (
     <div className="field">
