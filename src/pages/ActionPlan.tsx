@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { generateReport, sendReminder } from "../lib/agent";
-import type { EmailReminder, Initiative, InitiativeReport, InitiativeStatus } from "../lib/types";
+import type { Initiative, InitiativeReport, InitiativeStatus } from "../lib/types";
 
 /* ------------------------------------------------------------------ */
 /* Página principal                                                     */
