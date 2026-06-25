@@ -22,6 +22,7 @@ interface Bitacora { title: string; content: string; updated_at: string }
 interface DocRow   { name: string; content_text: string | null }
 
 router.post("/", async (req, res) => {
+  try {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     res.status(500).json({ error: "Falta ANTHROPIC_API_KEY en las variables de entorno." });
@@ -113,8 +114,15 @@ router.post("/", async (req, res) => {
 
     res.json({ reply: reply || "(El agente no devolvió texto.)" });
   } catch (err) {
+    console.error("[agent] Claude error:", err);
     res.status(502).json({
       error: `No se pudo contactar a Claude: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+  } catch (err) {
+    console.error("[agent] Unhandled error:", err);
+    res.status(500).json({
+      error: `Error inesperado: ${err instanceof Error ? err.message : String(err)}`,
     });
   }
 });

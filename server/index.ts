@@ -46,6 +46,12 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
 
+/* -------- Error handler global (captura async throws en Express 4) -------- */
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[unhandled]", err);
+  res.status(500).json({ error: `Error interno: ${err.message}` });
+});
+
 /* -------- React SPA -------- */
 app.use(express.static(DIST));
 // Todas las rutas no-API sirven el index.html para que el router de React funcione
