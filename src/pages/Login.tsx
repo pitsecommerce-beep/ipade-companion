@@ -42,8 +42,8 @@ export default function Login() {
       <div className="center-screen">
         <div className="card auth-card">
           <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <span className="brand-mark" style={{ display: "inline-grid" }}>
-              IC
+            <span className="brand-mark" style={{ display: "inline-grid", width: 56, height: 56 }}>
+              <img src="https://www.ipade.mx/wp-content/uploads/2022/10/fav.png?w=512" alt="IPADE" />
             </span>
             <h1 style={{ marginTop: 12, marginBottom: 2 }}>IPADE Companion</h1>
             <p className="muted" style={{ margin: 0 }}>
