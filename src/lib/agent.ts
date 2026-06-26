@@ -74,6 +74,7 @@ export interface PassportInput {
 
 export interface InterviewTurnResult {
   done: boolean;
+  propose_done?: boolean;
   reply: string;
   passport?: PassportInput;
 }
