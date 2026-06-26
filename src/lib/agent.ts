@@ -47,6 +47,44 @@ export async function askAgent(params: {
 }
 
 /* ------------------------------------------------------------------ */
+/* Entrevista de voz para el Pasaporte                                  */
+/* ------------------------------------------------------------------ */
+export interface PassportAnswers {
+  dev_priorities: string;
+  strategic_initiative: string;
+  obstacles: string;
+  additional_context: string;
+}
+
+export interface PassportInput {
+  full_name: string;
+  role: string;
+  seniority: string;
+  personal_context: string;
+  company_name: string;
+  industry: string;
+  company_size: string;
+  company_role: string;
+  industry_context: string;
+  company_context: string;
+  objectives: string;
+  answers: PassportAnswers;
+}
+
+export interface InterviewTurnResult {
+  done: boolean;
+  reply: string;
+  passport?: PassportInput;
+}
+
+export async function interviewTurn(params: {
+  message: string;
+  history: { role: "user" | "assistant"; content: string }[];
+}): Promise<InterviewTurnResult> {
+  return callApi<InterviewTurnResult>("/api/passport-interview", params);
+}
+
+/* ------------------------------------------------------------------ */
 /* Generación de Plan de Acción                                         */
 /* ------------------------------------------------------------------ */
 export interface GenerateReportResult {
