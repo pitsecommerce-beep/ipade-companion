@@ -261,7 +261,6 @@ export default function PassportVoice() {
     setMessages((prev) => [...prev, userMsg]);
     setStatus("thinking");
     setError(null);
-    setProposeDone(false);
 
     let apiMessage = userText;
     if (interruptedRef.current) {
