@@ -41,6 +41,7 @@ router.post("/", async (req, res) => {
 
     if (!ttsRes.ok) {
       const detail = await ttsRes.text();
+      console.error(`[tts] ElevenLabs ${ttsRes.status}: ${detail.slice(0, 500)}`);
       res.status(502).json({
         error: `ElevenLabs error (${ttsRes.status}): ${detail.slice(0, 300)}`,
       });
@@ -57,6 +58,45 @@ router.post("/", async (req, res) => {
     res.status(500).json({
       error: `Error TTS: ${err instanceof Error ? err.message : String(err)}`,
     });
+  }
+});
+
+router.get("/check", async (_req, res) => {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    res.json({ ok: false, reason: "ELEVENLABS_API_KEY no configurada." });
+    return;
+  }
+
+  try {
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID;
+
+    const [userRes, voiceRes] = await Promise.all([
+      fetch("https://api.elevenlabs.io/v1/user", {
+        headers: { "xi-api-key": apiKey },
+      }),
+      fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+        headers: { "xi-api-key": apiKey },
+      }),
+    ]);
+
+    const user = userRes.ok ? await userRes.json() as Record<string, unknown> : null;
+    const voice = voiceRes.ok ? await voiceRes.json() as Record<string, unknown> : null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sub = (user as any)?.subscription;
+
+    res.json({
+      ok: userRes.ok && voiceRes.ok,
+      api_key_valid: userRes.ok,
+      voice_id: voiceId,
+      voice_name: voice ? (voice as Record<string, unknown>).name : `ERROR ${voiceRes.status}`,
+      character_limit: sub?.character_limit ?? "?",
+      character_count: sub?.character_count ?? "?",
+      tier: sub?.tier ?? "?",
+    });
+  } catch (err) {
+    res.json({ ok: false, reason: String(err) });
   }
 });
 
