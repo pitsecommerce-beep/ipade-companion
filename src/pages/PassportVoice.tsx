@@ -126,6 +126,9 @@ export default function PassportVoice() {
   const abortRef = useRef<AbortController | null>(null);
   const autoListenRef = useRef(autoListen);
   const statusRef = useRef<Status>("idle");
+  const interruptedRef = useRef<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sentinelRef = useRef<any>(null);
 
   useEffect(() => { autoListenRef.current = autoListen; }, [autoListen]);
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -158,6 +161,10 @@ export default function PassportVoice() {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
+    if (sentinelRef.current) {
+      sentinelRef.current.stop();
+      sentinelRef.current = null;
+    }
     if (hasSpeechSynthesis) {
       speechSynthesis.cancel();
     }
@@ -167,17 +174,8 @@ export default function PassportVoice() {
 
   const SILENCE_DELAY = 2000;
 
-  const startListening = useCallback((interruptMode = false) => {
+  const startListening = useCallback(() => {
     if (!SpeechRecognitionAPI) return;
-
-    if (interruptMode) {
-      if (abortRef.current) {
-        abortRef.current.abort();
-        abortRef.current = null;
-      }
-      if (hasSpeechSynthesis) speechSynthesis.cancel();
-    }
-
     setInterim("");
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "es-MX";
@@ -237,11 +235,38 @@ export default function PassportVoice() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const startSentinel = useCallback((ac: AbortController) => {
+    if (!SpeechRecognitionAPI) return;
+    const sentinel = new SpeechRecognitionAPI();
+    sentinel.lang = "es-MX";
+    sentinel.interimResults = true;
+    sentinel.continuous = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    sentinel.onresult = (_e: any) => {
+      sentinel.stop();
+      sentinelRef.current = null;
+      ac.abort();
+      setTimeout(() => startListening(), 150);
+    };
+    sentinel.onerror = () => { sentinelRef.current = null; };
+    sentinel.onend = () => { sentinelRef.current = null; };
+
+    sentinelRef.current = sentinel;
+    sentinel.start();
+  }, [startListening]);
+
   const sendTurn = useCallback(async (userText: string) => {
     const userMsg: Message = { role: "user", content: userText };
     setMessages((prev) => [...prev, userMsg]);
     setStatus("thinking");
     setError(null);
+
+    let apiMessage = userText;
+    if (interruptedRef.current) {
+      apiMessage = `[SISTEMA: El participante te interrumpió. Tu respuesta anterior quedó incompleta: "${interruptedRef.current}". Decide si retomar ese punto o adaptarte a lo que dice ahora.]\n\n${userText}`;
+      interruptedRef.current = null;
+    }
 
     const ac = new AbortController();
     abortRef.current = ac;
@@ -253,7 +278,7 @@ export default function PassportVoice() {
 
     try {
       const result = await interviewTurn(
-        { message: userText, history: history.slice(0, -1) },
+        { message: apiMessage, history: history.slice(0, -1) },
         ac.signal,
       );
 
@@ -273,8 +298,17 @@ export default function PassportVoice() {
         if (!ac.signal.aborted) setStatus("idle");
       } else {
         setStatus("speaking");
+        interruptedRef.current = result.reply;
+        startSentinel(ac);
         await speak(result.reply, ac.signal);
+
+        if (sentinelRef.current) {
+          sentinelRef.current.stop();
+          sentinelRef.current = null;
+        }
+
         if (!ac.signal.aborted) {
+          interruptedRef.current = null;
           setStatus("idle");
           if (autoListenRef.current && hasSpeechRecognition) {
             startListening();
@@ -288,7 +322,7 @@ export default function PassportVoice() {
     } finally {
       if (abortRef.current === ac) abortRef.current = null;
     }
-  }, [startListening]);
+  }, [startListening, startSentinel]);
 
   const handleStart = useCallback(async () => {
     setStarted(true);
@@ -523,7 +557,7 @@ export default function PassportVoice() {
 
       <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
         {hasSpeechRecognition && status === "idle" && (
-          <button className="btn btn-primary" onClick={() => startListening()}>
+          <button className="btn btn-primary" onClick={startListening}>
             Hablar
           </button>
         )}
@@ -533,23 +567,13 @@ export default function PassportVoice() {
           </button>
         )}
         {(status === "thinking" || status === "speaking") && (
-          <>
-            <button
-              className="btn"
-              style={{ background: "#c0392b", color: "#fff", border: "none" }}
-              onClick={stopEverything}
-            >
-              Detener
-            </button>
-            {hasSpeechRecognition && (
-              <button
-                className="btn btn-ghost"
-                onClick={() => startListening(true)}
-              >
-                Interrumpir y hablar
-              </button>
-            )}
-          </>
+          <button
+            className="btn"
+            style={{ background: "#c0392b", color: "#fff", border: "none" }}
+            onClick={stopEverything}
+          >
+            Detener
+          </button>
         )}
 
         {hasSpeechRecognition && (

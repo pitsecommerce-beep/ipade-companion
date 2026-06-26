@@ -145,7 +145,12 @@ CIERRE — REGLAS ESTRICTAS:
 NOTAS SOBRE LA TRANSCRIPCIÓN DE VOZ:
 - El texto del usuario viene de un reconocimiento de voz automático. Puede contener errores de transcripción, frases cortadas o muletillas.
 - Si una respuesta parece incompleta o cortada, pide amablemente que repita o amplíe.
-- No interpretes una frase cortada como respuesta completa.`;
+- No interpretes una frase cortada como respuesta completa.
+
+INTERRUPCIONES:
+- A veces el mensaje del usuario incluirá una nota "[SISTEMA: El participante te interrumpió...]". Esto significa que el participante empezó a hablar mientras tú todavía estabas hablando.
+- Cuando te interrumpan, NO repitas tu respuesta anterior. Escucha lo que dice el participante y decide: si lo que dijo responde o complementa tu pregunta anterior, avanza. Si cambió de tema o corrigió algo, adáptate.
+- Sé natural: "Entendido." o "Claro." y continúa. No digas "veo que me interrumpiste" ni hagas referencia explícita a la interrupción.`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSystemPrompt(passport: any): string {
