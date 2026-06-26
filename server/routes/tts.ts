@@ -41,9 +41,25 @@ router.post("/", async (req, res) => {
 
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Transfer-Encoding", "chunked");
 
-    const arrayBuf = await ttsRes.arrayBuffer();
-    res.send(Buffer.from(arrayBuf));
+    if (!ttsRes.body) {
+      const arrayBuf = await ttsRes.arrayBuffer();
+      res.send(Buffer.from(arrayBuf));
+      return;
+    }
+
+    const reader = (ttsRes.body as ReadableStream<Uint8Array>).getReader();
+    try {
+      for (;;) {
+        const { done: eof, value } = await reader.read();
+        if (eof) break;
+        res.write(value);
+      }
+      res.end();
+    } catch {
+      res.end();
+    }
   } catch (err) {
     console.error("[tts] Error:", err);
     res.status(500).json({
