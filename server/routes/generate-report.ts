@@ -21,6 +21,34 @@ interface ClaudeResponse {
   initiatives: InitiativeItem[];
 }
 
+// Esquema de salida estructurada: obliga a Claude a devolver JSON válido con
+// esta forma exacta (sin texto antes/después, sin fences markdown). Elimina la
+// causa principal del 502 "no devolvió JSON válido".
+const OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["report_markdown", "initiatives"],
+  properties: {
+    report_markdown: { type: "string" },
+    initiatives: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "description", "category", "source", "email_subject", "email_body"],
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          category: { type: "string", enum: ["inmediata", "portafolio"] },
+          source: { type: "string", enum: ["passport", "bitacora"] },
+          email_subject: { type: "string" },
+          email_body: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
 router.post("/", async (req, res) => {
   try {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -154,9 +182,15 @@ Responde ÚNICAMENTE con JSON válido (sin texto antes ni después):
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        // 4096 truncaba el JSON (reporte + iniciativas + correos), rompiendo el
+        // parseo. Subimos el techo para que la respuesta completa quepa.
+        max_tokens: 8192,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
+        // Salida estructurada: garantiza JSON válido con la forma esperada.
+        output_config: {
+          format: { type: "json_schema", schema: OUTPUT_SCHEMA },
+        },
       }),
     });
 
@@ -169,22 +203,52 @@ Responde ÚNICAMENTE con JSON válido (sin texto antes ni después):
       return;
     }
 
-    const aiData = await aiRes.json() as { content?: { type: string; text: string }[] };
+    const aiData = await aiRes.json() as {
+      content?: { type: string; text: string }[];
+      stop_reason?: string;
+    };
     const rawText = (aiData.content ?? [])
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
 
-    console.log(`[generate-report] Respuesta de Claude recibida (${rawText.length} chars)`);
+    console.log(
+      `[generate-report] Respuesta de Claude recibida (${rawText.length} chars, stop_reason=${aiData.stop_reason})`,
+    );
+
+    // Si la respuesta se cortó por límite de tokens, el JSON queda incompleto.
+    // Avisamos con un mensaje claro en lugar de un genérico "JSON inválido".
+    if (aiData.stop_reason === "max_tokens") {
+      console.error("[generate-report] Respuesta truncada por max_tokens");
+      res.status(502).json({
+        error:
+          "El plan resultó muy extenso y la respuesta se cortó. Vuelve a intentar; si persiste, reduce el contenido de tus bitácoras.",
+      });
+      return;
+    }
 
     let parsed: ClaudeResponse;
     try {
-      const jsonMatch = rawText.match(/```json\s*([\s\S]+?)\s*```/) ?? rawText.match(/(\{[\s\S]+\})/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[1] : rawText) as ClaudeResponse;
+      // Con salida estructurada, rawText ya es JSON puro. Mantenemos una
+      // extracción tolerante (fences / primer '{' … último '}') por si acaso.
+      const fenced = rawText.match(/```json\s*([\s\S]+?)\s*```/);
+      let candidate = fenced ? fenced[1] : rawText;
+      if (!fenced) {
+        const first = candidate.indexOf("{");
+        const last = candidate.lastIndexOf("}");
+        if (first !== -1 && last > first) candidate = candidate.slice(first, last + 1);
+      }
+      parsed = JSON.parse(candidate) as ClaudeResponse;
     } catch (parseErr) {
       console.error("[generate-report] JSON parse error:", parseErr, "raw:", rawText.slice(0, 300));
       res.status(502).json({ error: "El agente no devolvió JSON válido. Intenta de nuevo." });
+      return;
+    }
+
+    if (!parsed?.report_markdown || !Array.isArray(parsed.initiatives)) {
+      console.error("[generate-report] JSON con forma inesperada:", rawText.slice(0, 300));
+      res.status(502).json({ error: "El agente devolvió un reporte incompleto. Intenta de nuevo." });
       return;
     }
 
