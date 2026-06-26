@@ -60,7 +60,7 @@ function Layout({ children }: { children: ReactNode }) {
           display: "grid", placeItems: "center", zIndex: 200, padding: 20,
         }}>
           <div className="card" style={{ maxWidth: 360, width: "100%", textAlign: "center", padding: "32px 28px" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
+            <div style={{ fontSize: 18, marginBottom: 12, fontWeight: 600, color: "var(--ipade-navy)" }}>Hasta pronto</div>
             <h2 style={{ margin: "0 0 8px" }}>¿Cerrar sesión?</h2>
             <p style={{ color: "var(--muted)", margin: "0 0 24px", fontSize: 14 }}>
               Tu información está guardada. Podrás volver a acceder en cualquier momento.
