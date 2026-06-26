@@ -35,7 +35,7 @@ function Layout({ children }: { children: ReactNode }) {
           <Brand />
           {user && (
             <nav className="nav">
-              <NavLink to="/" end>Jornadas</NavLink>
+              <NavLink to="/" end>Bitácora</NavLink>
               <NavLink to="/pasaporte">Pasaporte</NavLink>
               <NavLink to="/plan">Plan de Acción</NavLink>
               <button
