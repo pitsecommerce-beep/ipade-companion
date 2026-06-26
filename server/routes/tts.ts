@@ -21,7 +21,7 @@ router.post("/", async (req, res) => {
 
     const model = process.env.DEEPGRAM_VOICE_MODEL || DEFAULT_MODEL;
 
-    const ttsRes = await fetch(`${DEEPGRAM_URL}?model=${model}&encoding=mp3`, {
+    const ttsRes = await fetch(`${DEEPGRAM_URL}?model=${model}&encoding=mp3&speed=1.15`, {
       method: "POST",
       headers: {
         Authorization: `Token ${apiKey}`,
@@ -78,7 +78,7 @@ router.get("/check", async (_req, res) => {
   try {
     const model = process.env.DEEPGRAM_VOICE_MODEL || DEFAULT_MODEL;
 
-    const testRes = await fetch(`${DEEPGRAM_URL}?model=${model}&encoding=mp3`, {
+    const testRes = await fetch(`${DEEPGRAM_URL}?model=${model}&encoding=mp3&speed=1.15`, {
       method: "POST",
       headers: {
         Authorization: `Token ${apiKey}`,
