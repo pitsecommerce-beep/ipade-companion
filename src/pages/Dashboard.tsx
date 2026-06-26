@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import AgentChat from "../components/AgentChat";
 import type { StudySession } from "../lib/types";
 
 export default function Dashboard() {
@@ -58,10 +59,10 @@ export default function Dashboard() {
   return (
     <>
       <div className="page-head">
-        <h1>Mis sesiones</h1>
+        <h1>Inicio</h1>
         <p>
-          Crea una sesión por cada caso, módulo o tema del IPADE. Dentro de cada una
-          podrás escribir tus bitácoras, cargar materiales y consultar al agente.
+          Conversa con tu agente IPADE Companion o entra a una de tus sesiones para
+          trabajar un caso con sus bitácoras y materiales.
         </p>
       </div>
 
@@ -74,6 +75,37 @@ export default function Dashboard() {
       )}
 
       {error && <div className="alert alert-error">{error}</div>}
+
+      {/* Agente como elemento principal de la pantalla de inicio. */}
+      {user && (
+        <div className="card agent-hero">
+          <div className="agent-hero-head">
+            <span className="brand-mark">IC</span>
+            <div>
+              <h2 style={{ margin: 0 }}>Tu agente IPADE Companion</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Asistente general: conoce tu Pasaporte y te ayuda a resolver dudas o
+                a planear iniciativas según el contexto de tu empresa. Para trabajar
+                un caso con sus materiales, entra a la sesión correspondiente.
+              </p>
+            </div>
+          </div>
+          <AgentChat
+            sessionId={null}
+            userId={user.id}
+            logHeight="42vh"
+            intro="Hola, soy tu IPADE Companion. Puedo ayudarte con dudas generales del programa o a pensar una iniciativa considerando el contexto de tu empresa e industria. Para preguntas sobre un caso específico, ábrelo en su sesión."
+          />
+        </div>
+      )}
+
+      <div className="page-head" style={{ marginTop: 32 }}>
+        <h2 style={{ margin: 0 }}>Mis sesiones</h2>
+        <p style={{ margin: 0 }}>
+          Crea una sesión por cada caso, módulo o tema del IPADE. Dentro podrás
+          escribir bitácoras, cargar materiales y consultar al agente con ese contexto.
+        </p>
+      </div>
 
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Nueva sesión</h2>

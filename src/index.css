@@ -404,6 +404,20 @@ textarea {
   min-height: 52px;
 }
 
+/* ---------- Agente destacado (inicio) ---------- */
+.agent-hero {
+  border-top: 4px solid var(--ipade-gold);
+}
+.agent-hero-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.agent-hero-head .brand-mark {
+  flex: 0 0 auto;
+}
+
 .spinner {
   width: 18px;
   height: 18px;

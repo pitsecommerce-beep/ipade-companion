@@ -105,8 +105,14 @@ Notas:
 - `src/pages/`
   - `Login.tsx` — alta/ingreso.
   - `Passport.tsx` — formulario del Pasaporte IPADE.
-  - `Dashboard.tsx` — lista y creación de sesiones.
+  - `Dashboard.tsx` — pantalla de inicio: **agente general destacado** (sin
+    sesión, usa sólo el Pasaporte) + lista y creación de sesiones.
   - `SessionDetail.tsx` — pestañas **Bitácoras / Materiales / Agente**.
+- `src/components/AgentChat.tsx` — chat reutilizable del agente. Se usa con
+  `sessionId={null}` en el inicio (asistente general) y con `sessionId={id}`
+  dentro de una sesión (contexto de bitácoras + documentos). El historial se
+  guarda en `agent_messages`; los mensajes del asistente general llevan
+  `session_id = NULL`.
 - `src/lib/` — `supabase.ts`, `agent.ts`, `pdf.ts`, `types.ts`.
 - `src/index.css` — identidad visual IPADE.
 
