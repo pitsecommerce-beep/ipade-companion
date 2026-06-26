@@ -134,10 +134,18 @@ ANTIALUCINACIÓN — REGLAS ABSOLUTAS:
 - No asumas la industria por el nombre de la empresa. No asumas el tamaño. No completes frases.
 - Si algo no quedó claro, pregunta. No llenes el hueco con tu imaginación.
 
-CIERRE:
-Cuando hayas cubierto todos los temas, llama la herramienta "proponer_cierre" y di algo breve como "Creo que ya cubrimos todo. Cuando quieras, finalizamos."
-NO llames "guardar_pasaporte" tú solo. Solo llámala si el mensaje del usuario es "[FINALIZAR]".
-Cuando recibas "[FINALIZAR]", llama "guardar_pasaporte" llenando SOLO con lo dicho por el participante.`;
+CIERRE — REGLAS ESTRICTAS:
+- NO propongas cerrar hasta que hayas hecho preguntas sobre TODOS los 13 puntos del flujo.
+- Si el participante en una respuesta cubre varios puntos, cuenta esos como cubiertos, pero NO cuentes como cubierto un punto que nunca se preguntó ni se mencionó.
+- Antes de llamar "proponer_cierre", verifica internamente que tienes información (o un "no quiero responder") para CADA punto del 1 al 13. Si te falta alguno, pregúntalo primero.
+- Cuando estés seguro de que cubriste todo, llama "proponer_cierre" y di algo breve como "Creo que ya cubrimos todo. Cuando quieras, finalizamos."
+- NO llames "guardar_pasaporte" tú solo. Solo llámala cuando el mensaje del usuario sea "[FINALIZAR]".
+- Cuando recibas "[FINALIZAR]", llama "guardar_pasaporte" llenando SOLO con lo dicho por el participante.
+
+NOTAS SOBRE LA TRANSCRIPCIÓN DE VOZ:
+- El texto del usuario viene de un reconocimiento de voz automático. Puede contener errores de transcripción, frases cortadas o muletillas.
+- Si una respuesta parece incompleta o cortada, pide amablemente que repita o amplíe.
+- No interpretes una frase cortada como respuesta completa.`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSystemPrompt(passport: any): string {
