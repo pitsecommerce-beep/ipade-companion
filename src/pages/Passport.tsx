@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { Passport } from "../lib/types";
@@ -187,6 +188,9 @@ export default function PassportPage() {
           Tu perfil personal y el contexto de tu empresa e industria. El agente usa
           esta información para darte respuestas y acompañamiento a tu medida.
         </p>
+        <Link to="/pasaporte/voz" className="btn btn-primary" style={{ marginTop: 8, display: "inline-block" }}>
+          Llenar por voz
+        </Link>
       </div>
 
       {/* Aviso de privacidad */}

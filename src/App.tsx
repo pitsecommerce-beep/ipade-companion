@@ -7,6 +7,7 @@ import Passport from "./pages/Passport";
 import Dashboard from "./pages/Dashboard";
 import SessionDetail from "./pages/SessionDetail";
 import ActionPlan from "./pages/ActionPlan";
+import PassportVoice from "./pages/PassportVoice";
 import type { ReactNode } from "react";
 
 function Brand() {
@@ -137,6 +138,14 @@ export default function App() {
           element={
             <Protected>
               <Passport />
+            </Protected>
+          }
+        />
+        <Route
+          path="/pasaporte/voz"
+          element={
+            <Protected>
+              <PassportVoice />
             </Protected>
           }
         />

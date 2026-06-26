@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import agentRouter from "./routes/agent.js";
 import generateReportRouter from "./routes/generate-report.js";
 import sendReminderRouter from "./routes/send-reminder.js";
+import passportInterviewRouter from "./routes/passport-interview.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3001);
@@ -41,6 +42,7 @@ app.use(express.json({ limit: "2mb" }));
 app.use("/api/agent", agentRouter);
 app.use("/api/generate-report", generateReportRouter);
 app.use("/api/send-reminder", sendReminderRouter);
+app.use("/api/passport-interview", passportInterviewRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
