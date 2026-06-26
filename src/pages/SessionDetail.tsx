@@ -130,7 +130,7 @@ function RichTextEditor({
                 boxSizing: "border-box",
               }}
             >
-              {!c && <span style={{ fontSize: 10, lineHeight: 1 }}>✕</span>}
+              {!c && <span style={{ fontSize: 10, lineHeight: 1 }}>x</span>}
             </button>
           ))}
         </span>
@@ -429,9 +429,9 @@ function Bitacoras({ sessionId, userId }: { sessionId: string; userId: string })
                 )}
                 {hasReflection && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                    {parsed.insight   && <span className="tag">Insight ✓</span>}
-                    {parsed.quick_win && <span className="tag">Quick win ✓</span>}
-                    {parsed.loose_end && <span className="tag">Duda ✓</span>}
+                    {parsed.insight   && <span className="tag">Insight</span>}
+                    {parsed.quick_win && <span className="tag">Quick win</span>}
+                    {parsed.loose_end && <span className="tag">Duda</span>}
                   </div>
                 )}
                 <div className="btn-row">

@@ -113,6 +113,7 @@ export default function PassportVoice() {
   const [autoListen, setAutoListen] = useState(hasSpeechRecognition);
 
   const [done, setDone] = useState(false);
+  const [proposeDone, setProposeDone] = useState(false);
   const [passport, setPassport] = useState<PassportInput | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -234,6 +235,9 @@ export default function PassportVoice() {
       if (result.done && result.passport) {
         setDone(true);
         setPassport(result.passport);
+        setStatus("idle");
+      } else if (result.propose_done) {
+        setProposeDone(true);
         setStatus("speaking");
         await speak(result.reply, ac.signal);
         if (!ac.signal.aborted) setStatus("idle");
@@ -516,6 +520,21 @@ export default function PassportVoice() {
           </label>
         )}
       </div>
+
+      {proposeDone && status === "idle" && (
+        <div style={{ marginTop: 16, textAlign: "center" }}>
+          <button
+            className="btn btn-gold"
+            style={{ fontSize: 16, padding: "14px 36px" }}
+            onClick={() => { setProposeDone(false); sendTurn("[FINALIZAR]"); }}
+          >
+            Finalizar y revisar pasaporte
+          </button>
+          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+            O sigue hablando si quieres agregar algo más.
+          </p>
+        </div>
+      )}
 
       {/* Fallback de texto */}
       <form onSubmit={handleTextSubmit} style={{ marginTop: 12, display: "flex", gap: 8 }}>

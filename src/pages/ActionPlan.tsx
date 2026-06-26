@@ -16,8 +16,8 @@ const COLUMNS: { status: InitiativeStatus; label: string; color: string; bg: str
 ];
 
 const CATEGORY_BADGE = {
-  inmediata:  { icon: "⚡", color: "#16a34a", bgColor: "#dcfce7", label: "Inmediata"  },
-  portafolio: { icon: "🏛", color: "#92400e", bgColor: "#fef3c7", label: "Portafolio" },
+  inmediata:  { icon: "", color: "#16a34a", bgColor: "#dcfce7", label: "Inmediata"  },
+  portafolio: { icon: "", color: "#92400e", bgColor: "#fef3c7", label: "Portafolio" },
 };
 
 /** Fecha sugerida de recordatorio según categoría */
@@ -39,7 +39,7 @@ function printKanban(initiatives: Initiative[], reportDate: string) {
   const cardHtml = (i: Initiative) => {
     const b = CATEGORY_BADGE[i.category as keyof typeof CATEGORY_BADGE] ?? CATEGORY_BADGE.inmediata;
     return `<div class="card">
-      <span class="badge" style="background:${b.bgColor};color:${b.color}">${b.icon} ${b.label}</span>
+      <span class="badge" style="background:${b.bgColor};color:${b.color}">${b.label}</span>
       <div class="card-title">${i.title}</div>
       <div class="card-desc">${i.description}</div>
     </div>`;
@@ -105,6 +105,8 @@ export default function ActionPlan() {
   const [error, setError]             = useState<string | null>(null);
   const [reminderTarget, setReminderTarget] = useState<Initiative | null>(null);
   const [view, setView]               = useState<"list" | "kanban">("list");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting]       = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -141,6 +143,24 @@ export default function ActionPlan() {
       setError(err instanceof Error ? err.message : "Error al generar el reporte.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleReset() {
+    if (!user) return;
+    setResetting(true);
+    setError(null);
+    try {
+      await supabase.from("email_reminders").delete().eq("user_id", user.id);
+      await supabase.from("initiatives").delete().eq("user_id", user.id);
+      await supabase.from("initiative_reports").delete().eq("user_id", user.id);
+      setReport(null);
+      setInitiatives([]);
+      setConfirmReset(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al borrar.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -187,10 +207,16 @@ export default function ActionPlan() {
                 onClick={() => printKanban(initiatives, reportDateStr)}
                 title="Descargar PDF del tablero"
               >
-                📄 PDF
+                PDF
               </button>
               <button className="btn btn-ghost btn-sm" onClick={handleGenerate}>
-                ↺ Regenerar
+                Regenerar
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setConfirmReset(true)}
+              >
+                Borrar plan
               </button>
             </div>
           </div>
@@ -213,6 +239,33 @@ export default function ActionPlan() {
             />
           )}
         </>
+      )}
+
+      {confirmReset && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "grid", placeItems: "center", zIndex: 200, padding: 20,
+        }}>
+          <div className="card" style={{ maxWidth: 400, width: "100%", textAlign: "center", padding: "32px 28px" }}>
+            <h2 style={{ margin: "0 0 8px", color: "var(--danger)" }}>¿Borrar todo el Plan de Acción?</h2>
+            <p style={{ color: "var(--muted)", margin: "0 0 24px", fontSize: 14 }}>
+              Se eliminarán todas las iniciativas, reportes y recordatorios asociados. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                className="btn btn-sm"
+                style={{ background: "var(--danger)", color: "#fff", border: "none", padding: "8px 20px" }}
+                onClick={handleReset}
+                disabled={resetting}
+              >
+                {resetting ? "Borrando…" : "Sí, borrar todo"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setConfirmReset(false)} disabled={resetting}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {reminderTarget && user && (
@@ -247,8 +300,8 @@ function ViewToggle({ view, onChange }: { view: "list" | "kanban"; onChange: (v:
   );
   return (
     <div style={{ display: "flex", gap: 4 }}>
-      {btn("list",   "☰",  "Lista")}
-      {btn("kanban", "⬛", "Tablero")}
+      {btn("list",   "",  "Lista")}
+      {btn("kanban", "", "Tablero")}
     </div>
   );
 }
@@ -374,7 +427,7 @@ function KanbanCard({
           fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 6px",
           background: b.bgColor, color: b.color, whiteSpace: "nowrap",
         }}>
-          {b.icon} {b.label}
+          {b.label}
         </span>
         <span style={{ fontSize: 9, color: "var(--muted)", background: "#f3f4f6", borderRadius: 4, padding: "2px 5px" }}>
           {initiative.source === "bitacora" ? "Bitácora" : "Pasaporte"}
@@ -391,7 +444,7 @@ function KanbanCard({
         style={{ fontSize: 10, padding: "2px 7px" }}
         onClick={() => onReminder(initiative)}
       >
-        ✉ Recordatorio
+        Recordatorio
       </button>
     </div>
   );
@@ -437,10 +490,10 @@ function ListView({
 
   return (
     <div style={{ display: "grid", gap: 28 }}>
-      {section(inmediatas, "⚡ Iniciativas Inmediatas", "Implementables en semanas · pocos recursos",
+      {section(inmediatas, "Iniciativas Inmediatas", "Implementables en semanas · pocos recursos",
         "var(--ok)", "El agente no identificó iniciativas inmediatas.")}
       <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 12, letterSpacing: "1px" }}>· · ·</div>
-      {section(portafolio, "🏛 Portafolio de Iniciativas", "Meses de implementación · múltiples áreas o presupuesto",
+      {section(portafolio, "Portafolio de Iniciativas", "Meses de implementación · múltiples áreas o presupuesto",
         "var(--ipade-gold)", "No se identificaron iniciativas de portafolio.")}
     </div>
   );
@@ -480,7 +533,7 @@ function ListCard({
         {initiative.description}
       </p>
       <button className="btn btn-ghost btn-sm" onClick={onReminder}>
-        ✉ Programar recordatorio
+        Programar recordatorio
       </button>
     </div>
   );
@@ -492,7 +545,7 @@ function ListCard({
 function EmptyState({ onGenerate }: { onGenerate: () => void }) {
   return (
     <div className="card" style={{ textAlign: "center", padding: "48px 32px", borderTop: "4px solid var(--ipade-gold)" }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ipade-navy)", marginBottom: 16 }}>Plan de Acción</div>
       <h2 style={{ marginTop: 0 }}>Genera tu Plan de Acción</h2>
       <p style={{ color: "var(--muted)", maxWidth: 500, margin: "0 auto 24px" }}>
         El agente revisará tu Pasaporte y tus bitácoras para identificar y clasificar
@@ -581,7 +634,7 @@ function ReminderModal({
       <div className="card" style={{ width: "100%", maxWidth: 520, maxHeight: "90vh", overflow: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Recordatorio por correo</h2>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cerrar</button>
         </div>
         <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
           Iniciativa: <strong>{initiative.title}</strong>
@@ -591,8 +644,8 @@ function ReminderModal({
           <div>
             <div className="alert alert-ok">
               {sendNow
-                ? <>✓ Correo enviado a <strong>{emailTo}</strong>.</>
-                : <>✓ Recordatorio guardado para el <strong>{new Date(sendAt + "T12:00:00").toLocaleDateString("es-MX", { dateStyle: "long" })}</strong>.</>
+                ? <>Correo enviado a <strong>{emailTo}</strong>.</>
+                : <>Recordatorio guardado para el <strong>{new Date(sendAt + "T12:00:00").toLocaleDateString("es-MX", { dateStyle: "long" })}</strong>.</>
               }
             </div>
             <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={onClose}>Cerrar</button>
@@ -616,8 +669,8 @@ function ReminderModal({
                 <span>Fecha de recordatorio</span>
                 <span className="hint" style={{ fontWeight: 400 }}>
                   {initiative.category === "inmediata"
-                    ? "⚡ Sugerida en 2 semanas (iniciativa inmediata)"
-                    : "🏛 Sugerida en 90 días (iniciativa de portafolio)"}
+                    ? "Sugerida en 2 semanas (iniciativa inmediata)"
+                    : "Sugerida en 90 días (iniciativa de portafolio)"}
                 </span>
               </label>
               <input id="r-date" type="date" value={sendAt} min={new Date().toISOString().slice(0, 10)}

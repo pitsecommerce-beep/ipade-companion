@@ -34,10 +34,20 @@ interface PassportInput {
   answers: PassportAnswers;
 }
 
-const TOOL_SCHEMA = {
+const PROPOSE_TOOL = {
+  name: "proponer_cierre",
+  description:
+    "Llama esta herramienta cuando consideres que ya cubriste todos los temas de la entrevista. NO la llames antes de haber preguntado por todos los campos. El participante decidirá si está listo para finalizar.",
+  input_schema: {
+    type: "object" as const,
+    properties: {},
+  },
+};
+
+const SAVE_TOOL = {
   name: "guardar_pasaporte",
   description:
-    "Llama esta herramienta únicamente cuando ya tengas información suficiente y de calidad para todos los campos. Rellena cada campo con un resumen fiel de lo que dijo el participante, en español. No inventes; si un campo quedó sin información, déjalo como cadena vacía.",
+    "Llama SOLO cuando el participante confirme que quiere finalizar (mensaje '[FINALIZAR]'). Rellena cada campo EXCLUSIVAMENTE con lo que el participante dijo textualmente. Si un campo no fue mencionado, déjalo como cadena vacía. NUNCA inventes, inferir ni completes información que no fue dicha.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -85,19 +95,22 @@ const TOOL_SCHEMA = {
   },
 };
 
-const SYSTEM_PROMPT_BASE = `Eres entrevistador del IPADE. Llenas el Pasaporte IPADE conversando. Tus respuestas se leen en voz alta.
+const SYSTEM_PROMPT_BASE = `Eres entrevistador del IPADE Business School. Tu tarea es llenar el "Pasaporte IPADE" del participante mediante una conversación hablada.
 
-REGLA CLAVE: Máximo UNA frase de confirmación + UNA pregunta. Nada más. Sin listas, sin markdown, sin emojis. Habla como persona, no como documento.
+QUÉ ES EL PASAPORTE IPADE: Un perfil ejecutivo que recoge quién es el participante, su empresa, su industria y sus prioridades de desarrollo directivo. Se usa para personalizar su experiencia académica en el programa IPADE. No es un examen ni una evaluación.
+
+Tus respuestas se LEEN EN VOZ ALTA por un sintetizador de voz.
 
 FORMATO OBLIGATORIO de cada respuesta:
-"[Confirmación corta]. [Siguiente pregunta]"
+Máximo UNA frase de confirmación + UNA pregunta. Nada más.
+Sin listas, sin markdown, sin emojis. Habla como persona.
 Ejemplo: "Perfecto, Juan. ¿En qué empresa estás?"
 Ejemplo: "Entendido. ¿Cuál es tu mayor obstáculo hoy?"
 
 APERTURA (solo si el mensaje es "[INICIAR]" o historial vacío):
 "Bienvenido. Empecemos: ¿cuál es tu nombre completo?"
 
-FLUJO: Pregunta uno por uno en este orden:
+FLUJO — pregunta uno por uno:
 1. Nombre completo
 2. Puesto o cargo
 3. Trayectoria breve
@@ -114,7 +127,17 @@ FLUJO: Pregunta uno por uno en este orden:
 
 Si la respuesta cubre varios puntos, avanza saltando los ya respondidos. Si es vaga, UNA repregunta máximo. Si no quiere responder, avanza.
 
-CIERRE: "Listo, ya tengo todo. Revisa los datos y guárdalos." + llama "guardar_pasaporte".`;
+ANTIALUCINACIÓN — REGLAS ABSOLUTAS:
+- SOLO registra lo que el participante DIJO TEXTUALMENTE. No parafrasees creativamente.
+- NUNCA inventes datos, nombres, cifras, industrias ni contextos que no hayan sido mencionados.
+- Si no tienes información sobre un campo, déjalo VACÍO. Vacío es mejor que inventado.
+- No asumas la industria por el nombre de la empresa. No asumas el tamaño. No completes frases.
+- Si algo no quedó claro, pregunta. No llenes el hueco con tu imaginación.
+
+CIERRE:
+Cuando hayas cubierto todos los temas, llama la herramienta "proponer_cierre" y di algo breve como "Creo que ya cubrimos todo. Cuando quieras, finalizamos."
+NO llames "guardar_pasaporte" tú solo. Solo llámala si el mensaje del usuario es "[FINALIZAR]".
+Cuando recibas "[FINALIZAR]", llama "guardar_pasaporte" llenando SOLO con lo dicho por el participante.`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSystemPrompt(passport: any): string {
@@ -202,7 +225,7 @@ router.post("/", async (req, res) => {
         model: MODEL,
         max_tokens: 1500,
         system: systemPrompt,
-        tools: [TOOL_SCHEMA],
+        tools: [PROPOSE_TOOL, SAVE_TOOL],
         messages,
       }),
     });
@@ -221,13 +244,14 @@ router.post("/", async (req, res) => {
     const textParts = blocks.filter((b) => b.type === "text").map((b) => b.text ?? "");
     const reply = textParts.join("\n").trim() || "";
 
-    const toolBlock = blocks.find((b) => b.type === "tool_use" && b.name === "guardar_pasaporte");
+    const proposeBlock = blocks.find((b) => b.type === "tool_use" && b.name === "proponer_cierre");
+    const saveBlock = blocks.find((b) => b.type === "tool_use" && b.name === "guardar_pasaporte");
 
-    if (toolBlock && toolBlock.input) {
-      const p = toolBlock.input;
+    if (saveBlock && saveBlock.input) {
+      const p = saveBlock.input;
       res.json({
         done: true,
-        reply: reply || "Listo, ya llené los campos de tu Pasaporte para que los revises.",
+        reply: reply || "Listo, revisa los datos de tu Pasaporte.",
         passport: {
           full_name: p.full_name ?? "",
           role: p.role ?? "",
@@ -247,6 +271,12 @@ router.post("/", async (req, res) => {
             additional_context: p.answers?.additional_context ?? "",
           },
         },
+      });
+    } else if (proposeBlock) {
+      res.json({
+        done: false,
+        propose_done: true,
+        reply: reply || "Creo que ya cubrimos todo. Cuando quieras, finalizamos.",
       });
     } else {
       res.json({
