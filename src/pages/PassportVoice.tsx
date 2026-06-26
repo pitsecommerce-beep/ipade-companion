@@ -11,30 +11,48 @@ interface Message {
   content: string;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const SpeechRecognitionAPI =
   typeof window !== "undefined"
-    ? (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).SpeechRecognition ??
-      (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).webkitSpeechRecognition
+    ? (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     : null;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const hasSpeechRecognition = !!SpeechRecognitionAPI;
 const hasSpeechSynthesis = typeof window !== "undefined" && "speechSynthesis" in window;
 
 function pickSpanishVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
-  return voices.find((v) => v.lang.startsWith("es")) ?? null;
+  const isGoodVoice = (v: SpeechSynthesisVoice) =>
+    /google|microsoft|natural|enhanced|premium/i.test(v.name);
+  const spanish = voices.filter((v) => v.lang.startsWith("es"));
+  return spanish.find((v) => v.lang === "es-MX" && isGoodVoice(v))
+    ?? spanish.find(isGoodVoice)
+    ?? spanish.find((v) => v.lang === "es-MX")
+    ?? spanish[0]
+    ?? null;
 }
 
-function speak(text: string): Promise<void> {
+function speak(text: string, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (!hasSpeechSynthesis) { resolve(); return; }
     speechSynthesis.cancel();
+
+    if (signal?.aborted) { resolve(); return; }
+
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = "es-MX";
+    utt.rate = 1.05;
+    utt.pitch = 1.0;
     const voice = pickSpanishVoice();
     if (voice) utt.voice = voice;
     utt.onend = () => resolve();
     utt.onerror = () => resolve();
+
+    signal?.addEventListener("abort", () => {
+      speechSynthesis.cancel();
+    });
+
     speechSynthesis.speak(utt);
   });
 }
@@ -49,15 +67,21 @@ export default function PassportVoice() {
   const [interim, setInterim] = useState("");
   const [textInput, setTextInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [autoListen, setAutoListen] = useState(hasSpeechRecognition);
 
   const [done, setDone] = useState(false);
   const [passport, setPassport] = useState<PassportInput | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  const recognitionRef = useRef</* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<Message[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  const autoListenRef = useRef(autoListen);
+
+  useEffect(() => { autoListenRef.current = autoListen; }, [autoListen]);
 
   useEffect(() => {
     historyRef.current = messages;
@@ -67,7 +91,6 @@ export default function PassportVoice() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, interim, status]);
 
-  // Precargar voces
   useEffect(() => {
     if (hasSpeechSynthesis) {
       speechSynthesis.getVoices();
@@ -75,43 +98,21 @@ export default function PassportVoice() {
     }
   }, []);
 
-  const sendTurn = useCallback(async (userText: string) => {
-    const userMsg: Message = { role: "user", content: userText };
-    setMessages((prev) => [...prev, userMsg]);
-    setStatus("thinking");
-    setError(null);
-
-    const history = [...historyRef.current, userMsg].map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    try {
-      const result = await interviewTurn({ message: userText, history: history.slice(0, -1) });
-      const assistantMsg: Message = { role: "assistant", content: result.reply };
-      setMessages((prev) => [...prev, assistantMsg]);
-
-      if (result.done && result.passport) {
-        setDone(true);
-        setPassport(result.passport);
-        setStatus("speaking");
-        await speak(result.reply);
-        setStatus("idle");
-      } else {
-        setStatus("speaking");
-        await speak(result.reply);
-        setStatus("idle");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al contactar al agente.");
-      setStatus("idle");
+  const stopEverything = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    if (hasSpeechSynthesis) {
+      speechSynthesis.cancel();
+    }
+    setStatus("idle");
+    setInterim("");
   }, []);
-
-  const handleStart = useCallback(async () => {
-    setStarted(true);
-    await sendTurn("[INICIAR]");
-  }, [sendTurn]);
 
   const startListening = useCallback(() => {
     if (!SpeechRecognitionAPI) return;
@@ -121,7 +122,8 @@ export default function PassportVoice() {
     recognition.interimResults = true;
     recognition.continuous = false;
 
-    recognition.onresult = (event: /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
       let final = "";
       let interimText = "";
       for (let i = 0; i < event.results.length; i++) {
@@ -140,7 +142,8 @@ export default function PassportVoice() {
       }
     };
 
-    recognition.onerror = (event: /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (event: any) => {
       if (event.error === "not-allowed") {
         setError("Permiso de micrófono denegado. Puedes escribir tu respuesta abajo.");
       } else if (event.error !== "aborted") {
@@ -157,6 +160,62 @@ export default function PassportVoice() {
     recognitionRef.current = recognition;
     setStatus("listening");
     recognition.start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sendTurn = useCallback(async (userText: string) => {
+    const userMsg: Message = { role: "user", content: userText };
+    setMessages((prev) => [...prev, userMsg]);
+    setStatus("thinking");
+    setError(null);
+
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const history = [...historyRef.current, userMsg].map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    try {
+      const result = await interviewTurn(
+        { message: userText, history: history.slice(0, -1) },
+        ac.signal,
+      );
+
+      if (ac.signal.aborted) return;
+
+      const assistantMsg: Message = { role: "assistant", content: result.reply };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      if (result.done && result.passport) {
+        setDone(true);
+        setPassport(result.passport);
+        setStatus("speaking");
+        await speak(result.reply, ac.signal);
+        if (!ac.signal.aborted) setStatus("idle");
+      } else {
+        setStatus("speaking");
+        await speak(result.reply, ac.signal);
+        if (!ac.signal.aborted) {
+          setStatus("idle");
+          if (autoListenRef.current && hasSpeechRecognition) {
+            startListening();
+          }
+        }
+      }
+    } catch (err) {
+      if (ac.signal.aborted) return;
+      setError(err instanceof Error ? err.message : "Error al contactar al agente.");
+      setStatus("idle");
+    } finally {
+      if (abortRef.current === ac) abortRef.current = null;
+    }
+  }, [startListening]);
+
+  const handleStart = useCallback(async () => {
+    setStarted(true);
+    await sendTurn("[INICIAR]");
   }, [sendTurn]);
 
   const stopListening = useCallback(() => {
@@ -389,13 +448,29 @@ export default function PassportVoice() {
         )}
         {status === "listening" && (
           <button className="btn" style={{ background: "#c0392b", color: "#fff", border: "none" }} onClick={stopListening}>
-            Detener
+            Dejar de escuchar
           </button>
         )}
         {(status === "thinking" || status === "speaking") && (
-          <button className="btn" disabled>
-            {status === "thinking" ? "Pensando…" : "Hablando…"}
+          <button
+            className="btn"
+            style={{ background: "#c0392b", color: "#fff", border: "none" }}
+            onClick={stopEverything}
+          >
+            Detener
           </button>
+        )}
+
+        {hasSpeechRecognition && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--muted)", cursor: "pointer", userSelect: "none" }}>
+            <input
+              type="checkbox"
+              checked={autoListen}
+              onChange={(e) => setAutoListen(e.target.checked)}
+              style={{ width: "auto" }}
+            />
+            Escuchar automáticamente
+          </label>
         )}
       </div>
 

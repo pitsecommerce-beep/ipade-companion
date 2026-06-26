@@ -11,7 +11,7 @@ async function authHeader(): Promise<string> {
 }
 
 /** Llama a una ruta /api/* del servidor Railway con el token de sesión. */
-async function callApi<T>(path: string, body: unknown): Promise<T> {
+async function callApi<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
     headers: {
@@ -19,6 +19,7 @@ async function callApi<T>(path: string, body: unknown): Promise<T> {
       "Authorization": await authHeader(),
     },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
@@ -77,11 +78,14 @@ export interface InterviewTurnResult {
   passport?: PassportInput;
 }
 
-export async function interviewTurn(params: {
-  message: string;
-  history: { role: "user" | "assistant"; content: string }[];
-}): Promise<InterviewTurnResult> {
-  return callApi<InterviewTurnResult>("/api/passport-interview", params);
+export async function interviewTurn(
+  params: {
+    message: string;
+    history: { role: "user" | "assistant"; content: string }[];
+  },
+  signal?: AbortSignal,
+): Promise<InterviewTurnResult> {
+  return callApi<InterviewTurnResult>("/api/passport-interview", params, signal);
 }
 
 /* ------------------------------------------------------------------ */
