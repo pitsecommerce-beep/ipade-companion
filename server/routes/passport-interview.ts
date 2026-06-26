@@ -200,7 +200,7 @@ router.post("/", async (req, res) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 400,
+        max_tokens: 1500,
         system: systemPrompt,
         tools: [TOOL_SCHEMA],
         messages,

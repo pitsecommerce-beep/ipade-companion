@@ -42,7 +42,7 @@ function speakBrowser(text: string, signal?: AbortSignal): Promise<void> {
 
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = "es-MX";
-    utt.rate = 1.05;
+    utt.rate = 1.25;
     utt.pitch = 1.0;
     const voice = pickSpanishVoice();
     if (voice) utt.voice = voice;
