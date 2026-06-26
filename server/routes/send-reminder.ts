@@ -69,7 +69,10 @@ router.post("/", async (req, res) => {
   if (remErr || !reminder) { res.status(404).json({ error: "Recordatorio no encontrado." }); return; }
   if (reminder.status === "enviado") { res.status(409).json({ error: "Ya fue enviado." }); return; }
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "IPADE Companion <noreply@ipade-companion.app>";
+  // Por defecto usamos el remitente compartido de Resend, que funciona sin
+  // verificar un dominio propio. Para producción, configura RESEND_FROM_EMAIL
+  // con un dominio verificado en Resend (ej. "IPADE Companion <no-reply@tudominio.com>").
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "IPADE Companion <onboarding@resend.dev>";
 
   const resendRes = await fetch(RESEND_URL, {
     method: "POST",
@@ -86,14 +89,30 @@ router.post("/", async (req, res) => {
     }),
   });
 
-  const resendBody = await resendRes.json() as { id?: string; message?: string };
+  const resendBody = await resendRes.json().catch(() => ({})) as { id?: string; message?: string };
 
   if (!resendRes.ok) {
+    const detail = resendBody.message ?? JSON.stringify(resendBody);
+    console.error(`[send-reminder] Resend error ${resendRes.status}:`, detail);
+
+    // Mensajes accionables según la causa más común.
+    let friendly: string;
+    if (resendRes.status === 401 || resendRes.status === 403) {
+      friendly =
+        "No se pudo enviar el correo: la RESEND_API_KEY es inválida o el dominio remitente no está verificado en Resend. " +
+        "Verifica un dominio en Resend y configúralo en RESEND_FROM_EMAIL, o usa el remitente de prueba onboarding@resend.dev. " +
+        `(Detalle: ${detail})`;
+    } else if (resendRes.status === 422) {
+      friendly = `El correo fue rechazado por datos inválidos (remitente o destinatario). Detalle: ${detail}`;
+    } else {
+      friendly = `No se pudo enviar el correo (Resend ${resendRes.status}). Detalle: ${detail}`;
+    }
+
     await supabase
       .from("email_reminders")
-      .update({ status: "fallido", error_msg: JSON.stringify(resendBody) })
+      .update({ status: "fallido", error_msg: detail })
       .eq("id", reminder.id);
-    res.status(502).json({ error: `Resend error: ${JSON.stringify(resendBody)}` });
+    res.status(502).json({ error: friendly });
     return;
   }
 
