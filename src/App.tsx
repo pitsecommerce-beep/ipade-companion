@@ -1,7 +1,7 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Passport from "./pages/Passport";
 import Dashboard from "./pages/Dashboard";
@@ -120,6 +120,27 @@ function Protected({ children }: { children: ReactNode }) {
   return <Layout>{children}</Layout>;
 }
 
+function Home() {
+  const { user } = useAuth();
+  const [passportFilled, setPassportFilled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("passports")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPassportFilled(!!data?.full_name);
+      });
+  }, [user]);
+
+  if (passportFilled === null) return <div className="card">Cargando…</div>;
+  if (!passportFilled) return <Passport />;
+  return <Dashboard />;
+}
+
 export default function App() {
   return (
     <ConfigGuard>
@@ -129,7 +150,7 @@ export default function App() {
           path="/"
           element={
             <Protected>
-              <Dashboard />
+              <Home />
             </Protected>
           }
         />
