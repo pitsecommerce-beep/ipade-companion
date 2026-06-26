@@ -105,6 +105,8 @@ export default function ActionPlan() {
   const [error, setError]             = useState<string | null>(null);
   const [reminderTarget, setReminderTarget] = useState<Initiative | null>(null);
   const [view, setView]               = useState<"list" | "kanban">("list");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting]       = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -141,6 +143,24 @@ export default function ActionPlan() {
       setError(err instanceof Error ? err.message : "Error al generar el reporte.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleReset() {
+    if (!user) return;
+    setResetting(true);
+    setError(null);
+    try {
+      await supabase.from("email_reminders").delete().eq("user_id", user.id);
+      await supabase.from("initiatives").delete().eq("user_id", user.id);
+      await supabase.from("initiative_reports").delete().eq("user_id", user.id);
+      setReport(null);
+      setInitiatives([]);
+      setConfirmReset(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al borrar.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -192,6 +212,12 @@ export default function ActionPlan() {
               <button className="btn btn-ghost btn-sm" onClick={handleGenerate}>
                 ↺ Regenerar
               </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setConfirmReset(true)}
+              >
+                Borrar plan
+              </button>
             </div>
           </div>
 
@@ -213,6 +239,33 @@ export default function ActionPlan() {
             />
           )}
         </>
+      )}
+
+      {confirmReset && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "grid", placeItems: "center", zIndex: 200, padding: 20,
+        }}>
+          <div className="card" style={{ maxWidth: 400, width: "100%", textAlign: "center", padding: "32px 28px" }}>
+            <h2 style={{ margin: "0 0 8px", color: "var(--danger)" }}>¿Borrar todo el Plan de Acción?</h2>
+            <p style={{ color: "var(--muted)", margin: "0 0 24px", fontSize: 14 }}>
+              Se eliminarán todas las iniciativas, reportes y recordatorios asociados. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                className="btn btn-sm"
+                style={{ background: "var(--danger)", color: "#fff", border: "none", padding: "8px 20px" }}
+                onClick={handleReset}
+                disabled={resetting}
+              >
+                {resetting ? "Borrando…" : "Sí, borrar todo"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setConfirmReset(false)} disabled={resetting}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {reminderTarget && user && (
