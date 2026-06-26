@@ -84,7 +84,7 @@ const COMPANY: Question[] = [
   },
   {
     key: "objectives",
-    label: "Iniciativas u objetivos que tienes en mente",
+    label: "Iniciativas estratégicas",
     hint: "Proyectos o decisiones donde quieras apoyo del agente más adelante",
     long: true,
   },
