@@ -33,7 +33,7 @@ function pickSpanishVoice(): SpeechSynthesisVoice | null {
     ?? null;
 }
 
-function speak(text: string, signal?: AbortSignal): Promise<void> {
+function speakBrowser(text: string, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (!hasSpeechSynthesis) { resolve(); return; }
     speechSynthesis.cancel();
@@ -55,6 +55,48 @@ function speak(text: string, signal?: AbortSignal): Promise<void> {
 
     speechSynthesis.speak(utt);
   });
+}
+
+async function speakElevenLabs(text: string, signal?: AbortSignal): Promise<boolean> {
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal,
+    });
+    if (!res.ok) return false;
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    return new Promise((resolve) => {
+      const cleanup = () => URL.revokeObjectURL(url);
+
+      audio.onended = () => { cleanup(); resolve(true); };
+      audio.onerror = () => { cleanup(); resolve(false); };
+
+      signal?.addEventListener("abort", () => {
+        audio.pause();
+        audio.src = "";
+        cleanup();
+        resolve(true);
+      });
+
+      audio.play().catch(() => { cleanup(); resolve(false); });
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function speak(text: string, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return;
+  const ok = await speakElevenLabs(text, signal);
+  if (!ok && !signal?.aborted) {
+    await speakBrowser(text, signal);
+  }
 }
 
 export default function PassportVoice() {

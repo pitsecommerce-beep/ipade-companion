@@ -5,6 +5,7 @@ import agentRouter from "./routes/agent.js";
 import generateReportRouter from "./routes/generate-report.js";
 import sendReminderRouter from "./routes/send-reminder.js";
 import passportInterviewRouter from "./routes/passport-interview.js";
+import ttsRouter from "./routes/tts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3001);
@@ -16,6 +17,7 @@ const REQUIRED_VARS = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY", "ANTHROPIC
 const OPTIONAL_VARS: { name: string; feature: string }[] = [
   { name: "RESEND_API_KEY",    feature: "envío de correos recordatorio" },
   { name: "RESEND_FROM_EMAIL", feature: "dirección de origen de correos" },
+  { name: "ELEVENLABS_API_KEY", feature: "voz de alta calidad (ElevenLabs TTS)" },
 ];
 
 const missingRequired = REQUIRED_VARS.filter((v) => !process.env[v]);
@@ -43,6 +45,7 @@ app.use("/api/agent", agentRouter);
 app.use("/api/generate-report", generateReportRouter);
 app.use("/api/send-reminder", sendReminderRouter);
 app.use("/api/passport-interview", passportInterviewRouter);
+app.use("/api/tts", ttsRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
