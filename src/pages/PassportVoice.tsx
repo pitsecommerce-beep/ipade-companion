@@ -57,7 +57,7 @@ function speakBrowser(text: string, signal?: AbortSignal): Promise<void> {
   });
 }
 
-async function speakElevenLabs(text: string, signal?: AbortSignal): Promise<boolean> {
+async function speakTTS(text: string, signal?: AbortSignal): Promise<boolean> {
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
@@ -70,6 +70,7 @@ async function speakElevenLabs(text: string, signal?: AbortSignal): Promise<bool
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.preload = "auto";
 
     return new Promise((resolve) => {
       const cleanup = () => URL.revokeObjectURL(url);
@@ -93,7 +94,7 @@ async function speakElevenLabs(text: string, signal?: AbortSignal): Promise<bool
 
 async function speak(text: string, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return;
-  const ok = await speakElevenLabs(text, signal);
+  const ok = await speakTTS(text, signal);
   if (!ok && !signal?.aborted) {
     await speakBrowser(text, signal);
   }
