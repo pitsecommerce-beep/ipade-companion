@@ -35,6 +35,13 @@ export default function Dashboard() {
       .then(({ data }) => setHasPassport(Boolean(data)));
   }, [user]);
 
+  async function deleteSession(s: StudySession) {
+    if (!confirm(`¿Eliminar la jornada "${s.title}"?\n\nSe borrarán también sus bitácoras, materiales y mensajes del agente.`)) return;
+    const { error } = await supabase.from("study_sessions").delete().eq("id", s.id);
+    if (error) setError(error.message);
+    else load();
+  }
+
   async function createSession(e: FormEvent) {
     e.preventDefault();
     if (!user || !title.trim()) return;
@@ -114,8 +121,8 @@ export default function Dashboard() {
           </div>
         ) : (
           sessions.map((s) => (
-            <div key={s.id} className="list-item">
-              <div>
+            <div key={s.id} className="list-item" style={{ position: "relative" }}>
+              <div style={{ flex: 1 }}>
                 <h3>{s.title}</h3>
                 <small>
                   {s.description ? `${s.description} · ` : ""}
@@ -126,9 +133,24 @@ export default function Dashboard() {
                   })}
                 </small>
               </div>
-              <Link className="btn btn-ghost btn-sm" to={`/sesion/${s.id}`}>
-                Abrir →
-              </Link>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <Link className="btn btn-ghost btn-sm" to={`/sesion/${s.id}`}>
+                  Abrir →
+                </Link>
+                <button
+                  title="Eliminar jornada"
+                  onClick={() => deleteSession(s)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#ccc", fontSize: 16, lineHeight: 1, padding: "4px 6px",
+                    borderRadius: 4, transition: "color .15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#c0392b")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#ccc")}
+                >
+                  ×
+                </button>
+              </div>
             </div>
           ))
         )}

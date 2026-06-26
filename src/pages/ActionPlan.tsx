@@ -12,7 +12,7 @@ const COLUMNS: { status: InitiativeStatus; label: string; color: string; bg: str
   { status: "pendiente",   label: "Pendiente",   color: "#6b7280", bg: "#f9fafb" },
   { status: "en_progreso", label: "En progreso", color: "#2563eb", bg: "#eff6ff" },
   { status: "completada",  label: "Completada",  color: "#16a34a", bg: "#f0fdf4" },
-  { status: "diferida",    label: "Diferida",    color: "#d97706", bg: "#fffbeb" },
+  { status: "diferida",    label: "Demorada",    color: "#d97706", bg: "#fffbeb" },
 ];
 
 const CATEGORY_BADGE = {
@@ -286,11 +286,11 @@ function KanbanBoard({
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-      gap: 12,
-      /* Board fills available viewport height so no page scroll is needed */
-      height: "calc(100vh - 300px)",
-      minHeight: 360,
+      /* Columnas de al menos 300 px; se apilan automáticamente en pantallas
+         más angostas sin necesidad de scroll horizontal */
+      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+      gap: 16,
+      alignItems: "start",
     }}>
       {COLUMNS.map((col) => {
         const cards = initiatives.filter((i) => i.status === col.status);
@@ -326,8 +326,8 @@ function KanbanBoard({
               }}>{cards.length}</span>
             </div>
 
-            {/* Cards — scroll interno */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "8px", display: "flex", flexDirection: "column", gap: 7 }}>
+            {/* Cards — scroll interno con altura máxima cómoda */}
+            <div style={{ maxHeight: 520, overflowY: "auto", padding: "8px", display: "flex", flexDirection: "column", gap: 7 }}>
               {cards.map((i) => (
                 <KanbanCard key={i.id} initiative={i} onDragStart={onDragStart} onReminder={onReminder} />
               ))}
@@ -449,7 +449,7 @@ function ListView({
 
 const STATUS_LABELS: Record<string, string> = {
   pendiente: "Pendiente", en_progreso: "En progreso",
-  completada: "Completada", diferida: "Diferida",
+  completada: "Completada", diferida: "Demorada",
 };
 
 function ListCard({
