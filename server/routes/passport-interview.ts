@@ -5,7 +5,7 @@ const router = Router();
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 50;
 
 interface ReqBody {
   message: string;
@@ -227,6 +227,10 @@ router.post("/", async (req, res) => {
       { role: "user", content: body.message },
     ];
 
+    const tools = messages.length >= 20
+      ? [PROPOSE_TOOL, SAVE_TOOL]
+      : [SAVE_TOOL];
+
     const aiRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
@@ -238,7 +242,7 @@ router.post("/", async (req, res) => {
         model: MODEL,
         max_tokens: 1500,
         system: systemPrompt,
-        tools: [PROPOSE_TOOL, SAVE_TOOL],
+        tools,
         messages,
       }),
     });
