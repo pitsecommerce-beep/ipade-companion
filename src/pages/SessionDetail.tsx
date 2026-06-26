@@ -8,6 +8,29 @@ import type { AgentMessage, Bitacora, DocumentRecord, StudySession } from "../li
 
 type Tab = "bitacoras" | "materiales" | "agente";
 
+/**
+ * Convierte un nombre de archivo en una key válida para Supabase Storage:
+ * quita acentos/diacríticos, reemplaza espacios y caracteres no permitidos por
+ * guiones, y conserva la extensión. Evita el error 400 "Invalid key".
+ */
+function sanitizeStorageKey(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const ext = dot > 0 ? filename.slice(dot + 1) : "";
+
+  const clean = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // elimina diacríticos (í → i, ñ → n)
+      .replace(/[^a-zA-Z0-9._-]+/g, "-") // resto → guion
+      .replace(/-+/g, "-")
+      .replace(/^[-.]+|[-.]+$/g, "");
+
+  const safeBase = clean(base) || "archivo";
+  const safeExt = clean(ext).toLowerCase();
+  return safeExt ? `${safeBase}.${safeExt}` : safeBase;
+}
+
 interface BitacoraContent {
   notes: string;   // HTML desde el editor enriquecido
   insight: string;
@@ -479,7 +502,10 @@ function Materiales({ sessionId, userId }: { sessionId: string; userId: string }
     setError(null);
     setStatus(`Subiendo "${file.name}"…`);
     try {
-      const path = `${userId}/${sessionId}/${Date.now()}-${file.name}`;
+      // La key de Storage no admite acentos, espacios ni caracteres especiales
+      // (Supabase responde 400 "Invalid key"). Sanitizamos sólo la ruta; el
+      // nombre original se conserva en la columna `name` para mostrarlo.
+      const path = `${userId}/${sessionId}/${Date.now()}-${sanitizeStorageKey(file.name)}`;
       const { error: upErr } = await supabase.storage
         .from(MATERIALS_BUCKET)
         .upload(path, file, { upsert: false, contentType: file.type || undefined });
